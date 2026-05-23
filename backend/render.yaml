@@ -1,0 +1,134 @@
+services:
+  # ── Main API ──────────────────────────────────────────────────────
+  - type: web
+    name: omlivestreambackend-api
+    runtime: node
+    region: oregon           # or frankfurt if your users are in Europe/Africa
+    plan: free               # ← free tier works for MVP; upgrade to Starter ($7/mo) when you need always-on
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server.js
+    healthCheckPath: /health
+    autoDeploy: true         # auto-deploys on git push to main
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: HOST
+        value: 0.0.0.0
+
+      # ── These must be set manually in Render dashboard ───────────
+      # Render Dashboard → Your Service → Environment → Add Environment Variable
+
+      - key: API_BASE_URL
+        sync: false          # fill in after first deploy: https://omlivestreambackend-api.onrender.com
+      - key: FRONTEND_URL
+        sync: false          # your Vercel frontend URL: https://omlivestream.vercel.app
+
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      - key: JWT_SECRET
+        generateValue: true  # Render auto-generates a secure random value
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
+      - key: PAYSTACK_WEBHOOK_SECRET
+        sync: false
+
+      - key: OPENAI_API_KEY
+        sync: false
+
+      # mediasoup — set to Render's outbound IP (find in Render dashboard → Service → Info)
+      - key: MEDIASOUP_ANNOUNCED_IP
+        sync: false
+      - key: MEDIASOUP_LISTEN_IP
+        value: 0.0.0.0
+      - key: MEDIASOUP_MIN_PORT
+        value: 40000
+      - key: MEDIASOUP_MAX_PORT
+        value: 49999
+
+      - key: RTMP_RELAY_INTERNAL_URL
+        value: http://localhost:3002
+      - key: RTMP_RELAY_SECRET
+        generateValue: true
+
+      # Social OAuth — add as you register each app
+      - key: YOUTUBE_CLIENT_ID
+        sync: false
+      - key: YOUTUBE_CLIENT_SECRET
+        sync: false
+      - key: YOUTUBE_REDIRECT_URI
+        sync: false   # https://omlivestreambackend-api.onrender.com/api/v1/platforms/oauth/callback/youtube
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+      - key: FACEBOOK_REDIRECT_URI
+        sync: false
+      - key: INSTAGRAM_REDIRECT_URI
+        sync: false
+      - key: TWITCH_CLIENT_ID
+        sync: false
+      - key: TWITCH_CLIENT_SECRET
+        sync: false
+      - key: TWITCH_REDIRECT_URI
+        sync: false
+      - key: TIKTOK_CLIENT_KEY
+        sync: false
+      - key: TIKTOK_CLIENT_SECRET
+        sync: false
+      - key: TIKTOK_REDIRECT_URI
+        sync: false
+      - key: TWITTER_CLIENT_ID
+        sync: false
+      - key: TWITTER_CLIENT_SECRET
+        sync: false
+      - key: TWITTER_REDIRECT_URI
+        sync: false
+      - key: LINKEDIN_CLIENT_ID
+        sync: false
+      - key: LINKEDIN_CLIENT_SECRET
+        sync: false
+      - key: LINKEDIN_REDIRECT_URI
+        sync: false
+
+      - key: OTP_EXPIRY_MINUTES
+        value: 10
+      - key: OTP_MAX_ATTEMPTS
+        value: 3
+      - key: RATE_LIMIT_AUTH_MAX
+        value: 5
+      - key: RATE_LIMIT_AUTH_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_API_MAX
+        value: 100
+      - key: RATE_LIMIT_API_WINDOW_MS
+        value: 60000

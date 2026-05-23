@@ -1,0 +1,224 @@
+/**
+ * OmliveStream Plan Limits Service
+ * ─────────────────────────────────────────────────────────────────
+ * Single source of truth for what each plan can and cannot do.
+ * All enforcement goes through this service — no scattered checks.
+ *
+ * Plans:
+ *  free_trial → 90 days, 2 platforms, view comments (no replies)
+ *  free       → after trial, 1 platform, view comments, upgrade popups
+ *  premium    → all platforms, comment replies, unlimited everything
+ */
+
+import { supabaseAdmin } from '../../config/supabase';
+import { PremiumRequiredError, AppError } from '../../utils/errors';
+
+export type PlanType = 'free_trial' | 'free' | 'premium';
+
+// Hardcoded limits mirror the plan_limits table — no DB roundtrip on every request
+export const PLAN_LIMITS: Record<PlanType, {
+  maxStreamPlatforms: number;
+  canReplyComments:   boolean;
+  maxStreamsPerDay:   number;
+  recordingDays:      number;
+  showUpgradePopup:   boolean;
+  label:              string;
+}> = {
+  free_trial: {
+    maxStreamPlatforms: 2,
+    canReplyComments:   false,
+    maxStreamsPerDay:   3,
+    recordingDays:      30,
+    showUpgradePopup:   false,
+    label:              'Free Trial',
+  },
+  free: {
+    maxStreamPlatforms: 1,
+    canReplyComments:   false,
+    maxStreamsPerDay:   1,
+    recordingDays:      7,
+    showUpgradePopup:   true,
+    label:              'Free',
+  },
+  premium: {
+    maxStreamPlatforms: 8,
+    canReplyComments:   true,
+    maxStreamsPerDay:   99,
+    recordingDays:      365,
+    showUpgradePopup:   false,
+    label:              'Premium',
+  },
+};
+
+export class PlansService {
+
+  /**
+   * Get effective plan for a user, considering trial expiry.
+   * If trial has expired, returns 'free' regardless of DB value.
+   */
+  async getEffectivePlan(userId: string): Promise<{
+    plan:              PlanType;
+    trialActive:       boolean;
+    trialDaysLeft:     number | null;
+    trialExpired:      boolean;
+    limits:            typeof PLAN_LIMITS[PlanType];
+  }> {
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('plan, trial_started_at, trial_expires_at')
+      .eq('id', userId)
+      .single();
+
+    if (!user) throw new AppError('User not found', 404);
+
+    let plan = (user.plan ?? 'free_trial') as PlanType;
+    let trialDaysLeft: number | null = null;
+    let trialActive    = false;
+    let trialExpired   = false;
+
+    if (plan === 'free_trial' && user.trial_expires_at) {
+      const msLeft   = new Date(user.trial_expires_at).getTime() - Date.now();
+      trialDaysLeft  = Math.max(0, Math.ceil(msLeft / 86_400_000));
+      trialActive    = msLeft > 0;
+      trialExpired   = msLeft <= 0;
+
+      if (trialExpired) {
+        // Auto-downgrade in DB and use free limits now
+        await supabaseAdmin.from('users')
+          .update({ plan: 'free', updated_at: new Date().toISOString() })
+          .eq('id', userId);
+        plan = 'free';
+      }
+    }
+
+    return {
+      plan,
+      trialActive,
+      trialDaysLeft,
+      trialExpired,
+      limits: PLAN_LIMITS[plan],
+    };
+  }
+
+  /**
+   * Enforce: how many platforms can this user stream to?
+   * Throws a clear error if they exceed their plan limit.
+   */
+  async enforcePlatformLimit(userId: string, requestedPlatforms: string[]): Promise<void> {
+    const { plan, limits, trialDaysLeft } = await this.getEffectivePlan(userId);
+
+    if (requestedPlatforms.length > limits.maxStreamPlatforms) {
+      const trialNote = plan === 'free_trial' && trialDaysLeft !== null
+        ? ` Your trial (${trialDaysLeft} days left) allows ${limits.maxStreamPlatforms} platform${limits.maxStreamPlatforms > 1 ? 's' : ''}.`
+        : plan === 'free'
+          ? ` Your Free plan allows ${limits.maxStreamPlatforms} platform.`
+          : '';
+
+      throw new AppError(
+        `Your plan allows streaming to ${limits.maxStreamPlatforms} platform${limits.maxStreamPlatforms > 1 ? 's' : ''} at once.${trialNote} Upgrade to Premium for all 8 platforms.`,
+        403,
+        'PLAN_LIMIT_EXCEEDED'
+      );
+    }
+  }
+
+  /**
+   * Enforce: can this user reply to comments?
+   */
+  async enforceCommentReply(userId: string): Promise<void> {
+    const { limits } = await this.getEffectivePlan(userId);
+    if (!limits.canReplyComments) {
+      throw new PremiumRequiredError('Comment replies');
+    }
+  }
+
+  /**
+   * Enforce: daily stream count limit.
+   */
+  async enforceDailyStreamLimit(userId: string): Promise<void> {
+    const { plan, limits } = await this.getEffectivePlan(userId);
+    if (plan === 'premium') return; // unlimited
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const { count } = await supabaseAdmin
+      .from('streams')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', startOfDay.toISOString());
+
+    if ((count ?? 0) >= limits.maxStreamsPerDay) {
+      throw new AppError(
+        `You have reached your daily limit of ${limits.maxStreamsPerDay} stream${limits.maxStreamsPerDay > 1 ? 's' : ''} on the ${limits.label} plan. Upgrade to Premium for unlimited streams.`,
+        403,
+        'DAILY_LIMIT_EXCEEDED'
+      );
+    }
+  }
+
+  /**
+   * Returns the upgrade popup config for free/trial users.
+   * Returns null for premium users (no popup).
+   * Called by the frontend before or during a live session.
+   */
+  async getUpgradePopup(userId: string): Promise<{
+    show:         boolean;
+    type:         'trial_ending' | 'trial_expired' | 'free_limit' | null;
+    title:        string;
+    message:      string;
+    cta:          string;
+    ctaUrl:       string;
+    daysLeft:     number | null;
+    dismissible:  boolean;  // trial_ending popups can be dismissed; hard limits cannot
+  } | null> {
+    const { plan, limits, trialDaysLeft, trialExpired, trialActive } =
+      await this.getEffectivePlan(userId);
+
+    if (plan === 'premium') return { show: false, type: null, title: '', message: '', cta: '', ctaUrl: '', daysLeft: null, dismissible: true };
+
+    // Trial ending in 7 days or less
+    if (plan === 'free_trial' && trialActive && trialDaysLeft !== null && trialDaysLeft <= 7) {
+      return {
+        show:        true,
+        type:        'trial_ending',
+        title:       `⏳ Your free trial ends in ${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''}`,
+        message:     `Don't lose access to 2-platform streaming. Upgrade now and keep full access — no interruptions.`,
+        cta:         'Upgrade to Premium',
+        ctaUrl:      '/billing',
+        daysLeft:    trialDaysLeft,
+        dismissible: true,
+      };
+    }
+
+    // Trial just expired
+    if (trialExpired) {
+      return {
+        show:        true,
+        type:        'trial_expired',
+        title:       '🎯 Your free trial has ended',
+        message:     `You're now on the Free plan (1 platform). Upgrade to Premium to stream to all 8 platforms, reply to comments, and unlock unlimited streams.`,
+        cta:         'Upgrade to Premium',
+        ctaUrl:      '/billing',
+        daysLeft:    0,
+        dismissible: false,
+      };
+    }
+
+    // Free plan hitting limits (shown when they try to add platforms or reply)
+    if (plan === 'free' && limits.showUpgradePopup) {
+      return {
+        show:        true,
+        type:        'free_limit',
+        title:       '🚀 Unlock the full OmliveStream experience',
+        message:     `You're on the Free plan — stream to 1 platform with view-only comments. Upgrade to Premium for all 8 platforms, live comment replies, and 365-day recording storage.`,
+        cta:         'See Premium Plans',
+        ctaUrl:      '/billing',
+        daysLeft:    null,
+        dismissible: true,
+      };
+    }
+
+    return { show: false, type: null, title: '', message: '', cta: '', ctaUrl: '', daysLeft: null, dismissible: true };
+  }
+}

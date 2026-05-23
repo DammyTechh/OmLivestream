@@ -1,0 +1,143 @@
+'use client';
+import { create } from 'zustand';
+import { api, TOKEN_KEYS, unwrap } from '@/lib/api';
+
+export type Plan = 'free_trial' | 'free' | 'premium';
+export type Role = 'super_admin' | 'admin' | 'support';
+
+export interface User {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  dob?: string | null;
+  location?: string | null;
+  plan: Plan;
+  is_verified: boolean;
+  onboarding_completed?: boolean;
+  heard_from?: string[] | null;
+  use_case?: string[] | null;
+  trial_expires_at?: string | null;
+  waitlist_member?: boolean;
+  waitlist_reward_claimed?: boolean;
+  created_at?: string;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  full_name: string;
+  role: Role;
+}
+
+interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  hydrated: boolean;
+
+  setTokens: (access: string, refresh: string) => void;
+  setUser: (u: User | null) => void;
+  hydrate: () => void;
+  logout: () => void;
+  refreshProfile: () => Promise<void>;
+}
+
+export const useAuth = create<AuthState>((set, get) => ({
+  user: null,
+  accessToken: null,
+  refreshToken: null,
+  hydrated: false,
+
+  setTokens: (accessToken, refreshToken) => {
+    localStorage.setItem(TOKEN_KEYS.ACCESS, accessToken);
+    localStorage.setItem(TOKEN_KEYS.REFRESH, refreshToken);
+    set({ accessToken, refreshToken });
+  },
+
+  setUser: (user) => {
+    if (user) localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(user));
+    else localStorage.removeItem(TOKEN_KEYS.USER);
+    set({ user });
+  },
+
+  hydrate: () => {
+    if (typeof window === 'undefined') return;
+    const accessToken  = localStorage.getItem(TOKEN_KEYS.ACCESS);
+    const refreshToken = localStorage.getItem(TOKEN_KEYS.REFRESH);
+    const userStr      = localStorage.getItem(TOKEN_KEYS.USER);
+    set({
+      accessToken,
+      refreshToken,
+      user: userStr ? JSON.parse(userStr) : null,
+      hydrated: true,
+    });
+  },
+
+  refreshProfile: async () => {
+    try {
+      const user = unwrap<User>(await api.get('/users/me'));
+      localStorage.setItem(TOKEN_KEYS.USER, JSON.stringify(user));
+      set({ user });
+    } catch {
+      // fail silently — token may be invalid, guard will redirect
+    }
+  },
+
+  logout: () => {
+    localStorage.removeItem(TOKEN_KEYS.ACCESS);
+    localStorage.removeItem(TOKEN_KEYS.REFRESH);
+    localStorage.removeItem(TOKEN_KEYS.USER);
+    set({ accessToken: null, refreshToken: null, user: null });
+  },
+}));
+
+interface AdminState {
+  admin: AdminUser | null;
+  accessToken: string | null;
+  refreshToken: string | null;
+  hydrated: boolean;
+  setTokens: (access: string, refresh: string) => void;
+  setAdmin: (u: AdminUser | null) => void;
+  hydrate: () => void;
+  logout: () => void;
+}
+
+export const useAdmin = create<AdminState>((set) => ({
+  admin: null,
+  accessToken: null,
+  refreshToken: null,
+  hydrated: false,
+
+  setTokens: (accessToken, refreshToken) => {
+    localStorage.setItem(TOKEN_KEYS.ADMIN_ACCESS, accessToken);
+    localStorage.setItem(TOKEN_KEYS.ADMIN_REFRESH, refreshToken);
+    set({ accessToken, refreshToken });
+  },
+
+  setAdmin: (admin) => {
+    if (admin) localStorage.setItem(TOKEN_KEYS.ADMIN_USER, JSON.stringify(admin));
+    else localStorage.removeItem(TOKEN_KEYS.ADMIN_USER);
+    set({ admin });
+  },
+
+  hydrate: () => {
+    if (typeof window === 'undefined') return;
+    const accessToken  = localStorage.getItem(TOKEN_KEYS.ADMIN_ACCESS);
+    const refreshToken = localStorage.getItem(TOKEN_KEYS.ADMIN_REFRESH);
+    const adminStr     = localStorage.getItem(TOKEN_KEYS.ADMIN_USER);
+    set({
+      accessToken,
+      refreshToken,
+      admin: adminStr ? JSON.parse(adminStr) : null,
+      hydrated: true,
+    });
+  },
+
+  logout: () => {
+    localStorage.removeItem(TOKEN_KEYS.ADMIN_ACCESS);
+    localStorage.removeItem(TOKEN_KEYS.ADMIN_REFRESH);
+    localStorage.removeItem(TOKEN_KEYS.ADMIN_USER);
+    set({ accessToken: null, refreshToken: null, admin: null });
+  },
+}));

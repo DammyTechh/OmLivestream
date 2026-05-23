@@ -1,0 +1,49 @@
+version: '3.9'
+
+services:
+
+  # ── Main API (Node.js + Fastify + mediasoup) ──────────────────────
+  api:
+    build: { context: ., dockerfile: Dockerfile }
+    container_name: omlivestreambackend-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      RTMP_RELAY_INTERNAL_URL: http://rtmp-relay:3002
+    ports:
+      - "3001:3001"
+      # mediasoup UDP port range — must match MEDIASOUP_MIN/MAX_PORT in .env
+      - "40000-40050:40000-40050/udp"
+    volumes:
+      - /tmp/omlivestreambackend:/tmp/omlivestreambackend
+    depends_on: [rtmp-relay]
+    networks: [omls-net]
+
+  # ── Go RTMP Relay ─────────────────────────────────────────────────
+  rtmp-relay:
+    build: { context: ./rtmp-relay, dockerfile: Dockerfile }
+    container_name: omlivestreambackend-relay
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      RTMP_RELAY_SECRET: ${RTMP_RELAY_SECRET}
+    # Internal only — not exposed publicly
+    networks: [omls-net]
+
+  # ── BullMQ Video Worker (Node.js + ffmpeg) ────────────────────────
+  worker:
+    build: { context: ., dockerfile: Dockerfile }
+    container_name: omlivestreambackend-worker
+    restart: unless-stopped
+    command: ["node", "dist/jobs/worker.js"]
+    env_file: .env
+    volumes:
+      - /tmp/omlivestreambackend:/tmp/omlivestreambackend
+    depends_on: [api]
+    networks: [omls-net]
+
+networks:
+  omls-net:
+    driver: bridge

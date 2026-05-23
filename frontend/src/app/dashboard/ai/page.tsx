@@ -1,0 +1,165 @@
+'use client';
+import { useState } from 'react';
+import { Bot, Send, Sparkles, Wand2, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { api, getApiError, unwrap } from '@/lib/api';
+
+interface Message { role: 'user' | 'assistant'; content: string; }
+
+export default function AIStudioPage() {
+  const [mode, setMode] = useState<'chat' | 'title'>('chat');
+  const [messages, setMessages] = useState<Message[]>([
+    { role: 'assistant', content: "Hi! I'm your AI streaming assistant. I can help you write stream titles, descriptions, hashtags, and more. What are you streaming today?" },
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [quotaExhausted, setQuotaExhausted] = useState(false);
+
+  const [titlePrompt, setTitlePrompt] = useState('');
+  const [titles, setTitles] = useState<string[]>([]);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const userMsg = input;
+    setInput('');
+    setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
+    setLoading(true);
+    try {
+      const data = unwrap<{ reply: string }>(await api.post('/ai/chat', { message: userMsg }));
+      setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+    } catch (err) {
+      const msg = getApiError(err, 'AI is unavailable right now');
+      if (msg.includes('AI is temporarily unavailable')) setQuotaExhausted(true);
+      setMessages((prev) => [...prev, { role: 'assistant', content: `⚠️  ${msg}` }]);
+    } finally { setLoading(false); }
+  };
+
+  const generateTitles = async () => {
+    if (!titlePrompt.trim()) return toast.error('Describe your stream first');
+    setLoading(true);
+    try {
+      const data = unwrap<{ titles: string[] }>(await api.post('/ai/generate-title', { topic: titlePrompt }));
+      setTitles(data.titles || []);
+    } catch (err) {
+      const msg = getApiError(err, 'Could not generate titles');
+      if (msg.includes('AI is temporarily unavailable')) setQuotaExhausted(true);
+      toast.error(msg);
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">AI Studio</h1>
+        <p className="text-muted mt-1">Your creative partner — titles, scripts, thumbnails, hashtags.</p>
+      </div>
+
+      {quotaExhausted && (
+        <div className="rounded-2xl p-5 bg-warning/10 border border-warning/30 flex items-start gap-3">
+          <AlertCircle size={20} className="text-warning shrink-0 mt-0.5" />
+          <div>
+            <div className="font-medium">AI features are temporarily limited</div>
+            <p className="text-sm text-muted mt-1">
+              Our AI service has reached its usage quota. This is a platform-level limit and will reset soon. Please try again later — all other features are working normally.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => setMode('chat')}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition ${mode === 'chat' ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'}`}
+        >
+          <Bot size={14} className="inline mr-1.5" /> Chat
+        </button>
+        <button
+          onClick={() => setMode('title')}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition ${mode === 'title' ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'}`}
+        >
+          <Wand2 size={14} className="inline mr-1.5" /> Title Generator
+        </button>
+      </div>
+
+      {mode === 'chat' ? (
+        <Card className="p-0 overflow-hidden">
+          <div className="h-[500px] overflow-y-auto p-6 space-y-4">
+            {messages.map((m, i) => (
+              <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
+                  m.role === 'user' ? 'bg-primary/20' : 'bg-gradient-to-br from-primary to-accent'
+                }`}>
+                  {m.role === 'user' ? '👤' : <Sparkles size={14} className="text-white" />}
+                </div>
+                <div className={`max-w-md px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap ${
+                  m.role === 'user' ? 'bg-primary/20 text-text' : 'bg-white/5 text-text'
+                }`}>
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                  <Sparkles size={14} className="text-white animate-pulse" />
+                </div>
+                <div className="px-4 py-3 rounded-2xl bg-white/5 text-sm">
+                  <span className="inline-flex gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.4s' }} />
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <form
+            onSubmit={(e) => { e.preventDefault(); sendMessage(); }}
+            className="p-4 border-t border-border flex gap-2"
+          >
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask anything about your stream…"
+              className="input flex-1"
+              disabled={loading}
+            />
+            <Button type="submit" loading={loading} icon={<Send size={16} />}>Send</Button>
+          </form>
+        </Card>
+      ) : (
+        <Card className="space-y-5">
+          <div>
+            <label className="label">Describe your stream</label>
+            <textarea
+              value={titlePrompt}
+              onChange={(e) => setTitlePrompt(e.target.value)}
+              placeholder="e.g. A 2-hour Valorant ranked gameplay with chill vibes, for first-time viewers"
+              rows={4}
+              className="input resize-none"
+            />
+          </div>
+          <Button onClick={generateTitles} loading={loading} icon={<Wand2 size={16} />}>
+            Generate 5 titles
+          </Button>
+          {titles.length > 0 && (
+            <div className="space-y-2 pt-4 border-t border-border">
+              <p className="text-xs uppercase tracking-widest text-muted">Suggested titles</p>
+              {titles.map((t, i) => (
+                <button
+                  key={i}
+                  onClick={() => { navigator.clipboard.writeText(t); toast.success('Copied to clipboard'); }}
+                  className="w-full text-left p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/10 hover:border-primary/30"
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
