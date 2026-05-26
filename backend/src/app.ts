@@ -203,17 +203,21 @@ Multi-platform live streaming SaaS backend — stream to 8+ platforms simultaneo
   app.setNotFoundHandler((req, reply) =>
     sendError(reply, 'NOT_FOUND', `${req.method} ${req.url} not found`, 404));
 
-  // ── Health check ─────────────────────────────────────────────────
+  // ── Health check (root — for Render's port scanner & uptime monitors) ──
   app.get('/health', {
-    schema: {
-      tags: ['Health'],
-      summary: 'Server health check',
-      response: { 200: { type: 'object', properties: { status: { type: 'string' }, uptime: { type: 'number' }, timestamp: { type: 'string' }, env: { type: 'string' } } } },
-    },
+    schema: { hide: true },
   }, async (_req, reply) => reply.send({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString(), env: env.NODE_ENV }));
 
   // ── API v1 routes ────────────────────────────────────────────────
   await app.register(async (v1) => {
+    // Health inside v1 so Swagger "Try it out" works
+    v1.get('/health', {
+      schema: {
+        tags: ['Health'],
+        summary: 'Server health check',
+        response: { 200: { type: 'object', properties: { status: { type: 'string' }, uptime: { type: 'number' }, timestamp: { type: 'string' }, env: { type: 'string' } } } },
+      },
+    }, async (_req, reply) => reply.send({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString(), env: env.NODE_ENV }));
     await v1.register(authRoutes,       { prefix: '/auth' });
     await v1.register(usersRoutes,      { prefix: '/users' });
     await v1.register(avatarRoutes,     { prefix: '/users' });
