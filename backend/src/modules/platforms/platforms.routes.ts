@@ -22,9 +22,10 @@ export async function platformsRoutes(fastify: FastifyInstance): Promise<void> {
       params: { type: 'object', properties: { platform: { type: 'string' } } },
       querystring: { type: 'object', required: ['code','state'], properties: { code: { type: 'string' }, state: { type: 'string' } } } },
   }, async (req, reply) => {
-    const { platform } = req.params;
-    const code  = req.query.code;
-    const state = req.query.state;
+    const { platform } = req.params as { platform: string };
+    const q = req.query as { code: string; state: string };
+    const code  = q.code;
+    const state = q.state;
     const userId = await redis.get(REDIS_KEYS.OAUTH_STATE(state));
     if (!userId) return reply.status(400).send({ success: false, error: { code: 'INVALID_STATE', message: 'OAuth state invalid or expired' } });
     await redis.del(REDIS_KEYS.OAUTH_STATE(state));
