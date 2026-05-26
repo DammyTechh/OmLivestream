@@ -17,14 +17,14 @@ const manualSchema = z.object({ platform: z.enum(PLATFORMS), rtmpUrl: z.string()
 
 export async function platformsRoutes(fastify: FastifyInstance): Promise<void> {
   // OAuth callback — CSRF-validated, no bearer needed
-  fastify.get('/oauth/callback/:platform', {
+  fastify.get<{ Params: { platform: string }; Querystring: { code: string; state: string } }>('/oauth/callback/:platform', {
     schema: { tags: ['Platforms'], summary: 'OAuth callback (redirect from platform)',
       params: { type: 'object', properties: { platform: { type: 'string' } } },
       querystring: { type: 'object', required: ['code','state'], properties: { code: { type: 'string' }, state: { type: 'string' } } } },
-  }, async (req: FastifyRequest<{ Params: { platform: string }; Querystring: { code: string; state: string } }>, reply) => {
+  }, async (req, reply) => {
     const { platform } = req.params;
-    const code  = req.query.code  as string;
-    const state = req.query.state as string;
+    const code  = req.query.code;
+    const state = req.query.state;
     const userId = await redis.get(REDIS_KEYS.OAUTH_STATE(state));
     if (!userId) return reply.status(400).send({ success: false, error: { code: 'INVALID_STATE', message: 'OAuth state invalid or expired' } });
     await redis.del(REDIS_KEYS.OAUTH_STATE(state));
