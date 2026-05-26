@@ -26,7 +26,6 @@ export type DeliveryStatus   = 'pending' | 'sent' | 'failed' | 'skipped';
 export type DiscountType     = 'first_month_free' | 'six_month_50pct';
 export type ContactStatus    = 'unread' | 'read' | 'replied';
 
-// ── Helper type to define a table ─────────────────────────────────
 type TableDef<Row extends Record<string, unknown>> = {
   Row:    Row;
   Insert: Partial<Row> & Pick<Row, { [K in keyof Row]-?: undefined extends Row[K] ? never : K }[keyof Row]>;
