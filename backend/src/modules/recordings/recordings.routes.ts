@@ -59,7 +59,9 @@ export async function recordingsRoutes(fastify: FastifyInstance): Promise<void> 
   }, async (req: FastifyRequest<{ Params: { id: string } }>, reply) => {
     const u = getAuthUser(req);
     const { prompt } = editSchema.parse(req.body);
-    sendSuccess(reply, await svc.requestAiEdit(u.id, req.params.id, prompt), 'AI edit queued');
+    const { data: profile } = await (await import('../../config/supabase')).supabaseAdmin
+      .from('users').select('plan').eq('id', u.id).single();
+    sendSuccess(reply, await svc.requestAiEdit(u.id, req.params.id, prompt, profile?.plan ?? 'free'), 'AI edit queued');
   });
 
   fastify.get('/:id/edit-status', {
@@ -86,7 +88,7 @@ export async function recordingsRoutes(fastify: FastifyInstance): Promise<void> 
   }, async (req: FastifyRequest<{ Params: { id: string } }>, reply) => {
     const u = getAuthUser(req);
     const b = publishSchema.parse(req.body);
-    await svc.publish(u.id, req.params.id, b);
+    await svc.publish(u.id, req.params.id, b.platform, b.caption ?? '', b.scheduledAt);
     sendSuccess(reply, null, 'Publishing queued');
   });
 }

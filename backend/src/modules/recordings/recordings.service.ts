@@ -58,7 +58,7 @@ export class RecordingsService {
     });
 
     const job = await videoEditQueue.add('ai-edit', { editId, recordingId, userId, prompt, fileUrl: rec.file_url });
-    return { jobId: job.id as string };
+    return { jobId: (job?.id ?? editId) as string };
   }
 
   async getEditStatus(userId: string, recordingId: string) {
