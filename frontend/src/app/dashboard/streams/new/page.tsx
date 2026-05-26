@@ -186,7 +186,7 @@ export default function NewStreamPage() {
     }
   };
 
-  // ─── Render ─────────────────────────────────────────────────────
+  
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <Link href="/dashboard/streams" className="inline-flex items-center gap-2 text-sm text-muted hover:text-text">

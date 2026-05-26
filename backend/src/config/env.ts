@@ -1,6 +1,12 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
+// Normalise NODE_ENV — Render sets it as "Production" (capital P)
+// but our schema (and Node.js convention) expects lowercase.
+if (process.env.NODE_ENV) {
+  process.env.NODE_ENV = process.env.NODE_ENV.toLowerCase();
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3001),
@@ -22,9 +28,9 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().startsWith('re_'),
   EMAIL_FROM: z.string().min(1),
 
-  UPSTASH_REDIS_URL:        z.string().optional().default(''),   // rediss:// TCP URL for BullMQ (optional locally)
-  UPSTASH_REDIS_REST_URL:   z.string().url(),     // https:// REST URL for general use
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1),    // REST token
+  UPSTASH_REDIS_URL:        z.string().optional().default(''),
+  UPSTASH_REDIS_REST_URL:   z.string().url(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1),
 
   PAYSTACK_SECRET_KEY: z.string().min(1),
   PAYSTACK_PUBLIC_KEY: z.string().min(1),
