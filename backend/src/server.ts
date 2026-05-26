@@ -34,7 +34,7 @@ async function main(): Promise<void> {
   // Start listening
   await app.listen({ port: env.PORT, host: env.HOST });
   logger.info(`🚀 OmliveStream API  →  http://${env.HOST}:${env.PORT}`);
-  logger.info(`📖 Swagger docs      →  http://localhost:${env.PORT}/api/docs`);
+  logger.info(`📖 Swagger docs      →  http://localhost:${env.PORT}/docs`);
   logger.info(`❤️  Health check      →  http://localhost:${env.PORT}/health`);
 
   // Graceful shutdown

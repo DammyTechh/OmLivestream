@@ -169,10 +169,8 @@ Multi-platform live streaming SaaS backend — stream to 8+ platforms simultaneo
   });
 
   await app.register(fastifySwaggerUi, {
-    routePrefix: '/api/docs',
+    routePrefix: '/docs',
     uiConfig:    { docExpansion: 'list', deepLinking: true, persistAuthorization: true, displayRequestDuration: true },
-    staticCSP:   true,
-    transformStaticCSP: (header) => header,
     transformSpecificationClone: true,
   });
 
