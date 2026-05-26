@@ -33,8 +33,8 @@ type TableDef<Row extends Record<string, unknown>> = {
 };
 
 export interface Database {
-  __PostgrestVersion: "12";
   public: {
+    PostgrestVersion: "12";
     Tables: {
 
       // ── users ──────────────────────────────────────────────────
