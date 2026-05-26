@@ -1,7 +1,7 @@
 {
   "name": "omlivestreambackend",
   "version": "1.0.0",
-  "description": "OmliveStream — Multi-Platform Live Streaming SaaS Backend",
+  "description": "OmliveStream \u2014 Multi-Platform Live Streaming SaaS Backend",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -42,9 +42,7 @@
     "resend": "^3.3.0",
     "socket.io": "^4.7.5",
     "uuid": "^10.0.0",
-    "zod": "^3.23.8"
-  },
-  "devDependencies": {
+    "zod": "^3.23.8",
     "@types/bcryptjs": "^2.4.6",
     "@types/fluent-ffmpeg": "^2.1.24",
     "@types/jsonwebtoken": "^9.0.6",
@@ -52,6 +50,10 @@
     "@types/node-cron": "^3.0.11",
     "@types/supertest": "^6.0.2",
     "@types/uuid": "^10.0.0",
+    "typescript": "^5.5.3",
+    "tsx": "^4.16.2"
+  },
+  "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.15.0",
     "@typescript-eslint/parser": "^7.15.0",
     "@vitest/coverage-v8": "^1.6.0",
@@ -60,8 +62,6 @@
     "nock": "^13.5.4",
     "prettier": "^3.3.3",
     "supertest": "^7.0.0",
-    "tsx": "^4.16.2",
-    "typescript": "^5.5.3",
     "vitest": "^1.6.0"
   }
 }

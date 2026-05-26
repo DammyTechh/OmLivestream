@@ -143,7 +143,7 @@ Multi-platform live streaming SaaS backend — stream to 8+ platforms simultaneo
           Unauthorized:    { type: 'object', properties: { success: { type: 'boolean', example: false }, error: { type: 'object', properties: { code: { type: 'string', example: 'UNAUTHORIZED' }, message: { type: 'string' } } } } },
           Forbidden:       { type: 'object', properties: { success: { type: 'boolean', example: false }, error: { type: 'object', properties: { code: { type: 'string', example: 'PREMIUM_REQUIRED' }, message: { type: 'string' } } } } },
           NotFound:        { type: 'object', properties: { success: { type: 'boolean', example: false }, error: { type: 'object', properties: { code: { type: 'string', example: 'NOT_FOUND' }, message: { type: 'string' } } } } },
-          ValidationError: { type: 'object', properties: { success: { type: 'boolean', example: false }, error: { type: 'object', properties: { code: { type: 'string', example: 'VALIDATION_ERROR' }, message: { type: 'string' }, details: { type: 'array' } } } } },
+          ValidationError: { type: 'object', properties: { success: { type: 'boolean', example: false }, error: { type: 'object', properties: { code: { type: 'string', example: 'VALIDATION_ERROR' }, message: { type: 'string' }, details: { type: 'array', items: { type: 'string' } } } } } },
           TooManyRequests: { type: 'object', properties: { success: { type: 'boolean', example: false }, error: { type: 'object', properties: { code: { type: 'string', example: 'TOO_MANY_REQUESTS' }, message: { type: 'string' } } } } },
         },
       },
@@ -170,7 +170,7 @@ Multi-platform live streaming SaaS backend — stream to 8+ platforms simultaneo
 
   await app.register(fastifySwaggerUi, {
     routePrefix: '/api/docs',
-    uiConfig:    { docExpansion: 'tag', deepLinking: true, persistAuthorization: true, displayRequestDuration: true },
+    uiConfig:    { docExpansion: 'list', deepLinking: true, persistAuthorization: true, displayRequestDuration: true },
     staticCSP:   true,
     transformStaticCSP: (header) => header,
     transformSpecificationClone: true,
