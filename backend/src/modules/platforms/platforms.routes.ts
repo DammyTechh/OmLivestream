@@ -29,7 +29,7 @@ export async function platformsRoutes(fastify: FastifyInstance): Promise<void> {
     const userId = await redis.get(REDIS_KEYS.OAUTH_STATE(state));
     if (!userId) return reply.status(400).send({ success: false, error: { code: 'INVALID_STATE', message: 'OAuth state invalid or expired' } });
     await redis.del(REDIS_KEYS.OAUTH_STATE(state));
-    await svc.handleOAuthCallback(platform as Platform, code, userId);
+    await svc.handleOAuthCallback(platform as Platform, code, userId as string);
     reply.redirect(`${env.FRONTEND_URL}/settings/platforms?connected=${platform}`);
   });
 
