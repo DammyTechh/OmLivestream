@@ -236,16 +236,16 @@ Returns immediately with the number of recipients queued. Check stats via GET /b
 
   // ══ Delete draft ═══════════════════════════════════════════════
 
-  fastify.delete('/:id', {
+  fastify.delete<{ Params: { id: string } }>('/:id', {
     schema: {
       tags: [TAG],
       summary: 'Permanently delete a draft broadcast',
       description: 'Only draft broadcasts can be deleted. Use cancel for scheduled ones.',
       security: AUTH,
-      params: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+      params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
     },
     preHandler: [requireRole('super_admin', 'admin')],
-  }, async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  }, async (req, reply: FastifyReply) => {
     const admin = getAdminUser(req);
     await svc.delete(admin.sub, req.params.id);
     sendNoContent(reply);

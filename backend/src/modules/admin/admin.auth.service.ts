@@ -28,13 +28,13 @@ export class AdminAuthService {
     const accessToken = jwt.sign(
       { sub: admin.id, email: admin.email, role: admin.role, isAdmin: true },
       env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '8h' as any }
     );
 
     const refreshToken = jwt.sign(
       { sub: admin.id, email: admin.email, role: admin.role, isAdmin: true },
       env.JWT_REFRESH_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '7d' as any }
     );
 
     // Store session
@@ -84,7 +84,7 @@ export class AdminAuthService {
     const accessToken = jwt.sign(
       { sub: payload.sub, email: payload.email, role: payload.role, isAdmin: true },
       env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '8h' as any }
     );
     return { accessToken };
   }

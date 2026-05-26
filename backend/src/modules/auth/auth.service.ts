@@ -324,7 +324,7 @@ export class AuthService {
 
     const accessToken = jwt.sign(
       { sub: payload.sub, email: payload.email, plan: payload.plan },
-      env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN }
+      env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as any }
     );
     return { accessToken };
   }
@@ -354,8 +354,8 @@ export class AuthService {
   private async issueTokens(
     userId: string, email: string, plan: Plan, ip: string, userAgent: string
   ): Promise<TokenPair> {
-    const accessToken  = jwt.sign({ sub: userId, email, plan }, env.JWT_SECRET,         { expiresIn: env.JWT_EXPIRES_IN });
-    const refreshToken = jwt.sign({ sub: userId, email, plan }, env.JWT_REFRESH_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRES_IN });
+    const accessToken  = jwt.sign({ sub: userId, email, plan }, env.JWT_SECRET,         { expiresIn: env.JWT_EXPIRES_IN as any });
+    const refreshToken = jwt.sign({ sub: userId, email, plan }, env.JWT_REFRESH_SECRET, { expiresIn: env.JWT_REFRESH_EXPIRES_IN as any });
 
     await supabaseAdmin.from('sessions').insert({
       id: uuidv4(), user_id: userId,
