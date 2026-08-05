@@ -9,6 +9,7 @@ import fastifySwaggerUi   from '@fastify/swagger-ui';
 
 
 import { env, corsAllowedOrigins } from './config/env';
+import { redis }          from './config/redis';
 import { logger }         from './config/logger';
 import { AppError }       from './utils/errors';
 import { sendError }      from './utils/response';
@@ -141,7 +142,12 @@ Multi-platform live streaming SaaS backend — stream to 8+ platforms simultaneo
       },
       servers: [
         { url: `${env.API_BASE_URL}/api/v1`, description: 'Current server' },
-        { url: 'http://localhost:3001/api/v1', description: 'Local development' },
+        // Only offered off-production. Listing it in prod lets "Try it out"
+        // fire at http://localhost:3001 from a page served over HTTPS, which
+        // the browser blocks as mixed content and reports as a CORS failure.
+        ...(env.NODE_ENV !== 'production'
+          ? [{ url: 'http://localhost:3001/api/v1', description: 'Local development' }]
+          : []),
       ],
       components: {
         securitySchemes: {
@@ -223,9 +229,16 @@ Multi-platform live streaming SaaS backend — stream to 8+ platforms simultaneo
       schema: {
         tags: ['Health'],
         summary: 'Server health check',
-        response: { 200: { type: 'object', properties: { status: { type: 'string' }, uptime: { type: 'number' }, timestamp: { type: 'string' }, env: { type: 'string' } } } },
+        response: { 200: { type: 'object', properties: { status: { type: 'string' }, uptime: { type: 'number' }, timestamp: { type: 'string' }, env: { type: 'string' }, redis: { type: 'string' } } } },
       },
-    }, async (_req, reply) => reply.send({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString(), env: env.NODE_ENV }));
+      // Dependency probe, so this must not be cached or rate-limited away.
+    }, async (_req, reply) => reply.send({
+      status:    'ok',
+      uptime:    process.uptime(),
+      timestamp: new Date().toISOString(),
+      env:       env.NODE_ENV,
+      redis:     (await redis.ping()) ? 'ok' : 'degraded',
+    }));
     await v1.register(authRoutes,       { prefix: '/auth' });
     await v1.register(usersRoutes,      { prefix: '/users' });
     await v1.register(avatarRoutes,     { prefix: '/users' });

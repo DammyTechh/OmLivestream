@@ -50,7 +50,17 @@ const envSchema = z.object({
 
   PAYSTACK_SECRET_KEY: z.string().min(1),
   PAYSTACK_PUBLIC_KEY: z.string().min(1),
-  PAYSTACK_WEBHOOK_SECRET: z.string().min(1),
+  // This is the HMAC-SHA512 signing secret from the Paystack dashboard —
+  // NOT the webhook endpoint URL. Pasting the URL here is an easy mistake
+  // and it fails silently: every webhook signature mismatches, so paid
+  // subscriptions never activate. Reject it at boot instead.
+  PAYSTACK_WEBHOOK_SECRET: z
+    .string()
+    .min(1)
+    .refine((v) => !/^https?:\/\//i.test(v), {
+      message:
+        'looks like a URL — this must be the Paystack webhook signing secret, not the endpoint URL',
+    }),
 
   OPENAI_API_KEY: z.string().startsWith('sk-'),
 
@@ -95,7 +105,31 @@ const envSchema = z.object({
   RATE_LIMIT_API_WINDOW_MS: z.coerce.number().default(60000),
 });
 
-const parsed = envSchema.safeParse(process.env);
+/**
+ * Strip surrounding quotes and trailing whitespace from every value before
+ * validation.
+ *
+ * Pasting a value into a dashboard field very easily carries a trailing
+ * newline, and some hosts round-trip that as a literal backslash-n. Neither
+ * is visible on screen, and the failures are baffling:
+ *   - `SUPPORT_EMAIL` fails `.email()` and the process exits at boot
+ *   - a URL still passes `.url()` (WHATWG tolerates trailing whitespace)
+ *     but then string-concatenates into a broken link
+ * Normalising once here is much cheaper than debugging it per-variable.
+ */
+function clean(raw: NodeJS.ProcessEnv): Record<string, string | undefined> {
+  const out: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof v !== 'string') { out[k] = v; continue; }
+    out[k] = v
+      .replace(/^\s*(['"])([\s\S]*)\1\s*$/, '$2') // drop wrapping quotes
+      .replace(/(?:\\[rn])+$/g, '')               // literal "\n" / "\r"
+      .trim();
+  }
+  return out;
+}
+
+const parsed = envSchema.safeParse(clean(process.env));
 
 if (!parsed.success) {
   console.error('\n❌  OmliveStream — Invalid environment variables:\n');
