@@ -104,8 +104,8 @@ https://omlivestream-api.onrender.com/api/v1/platforms/oauth/callback/linkedin
 
 In **Vercel** → Your Frontend Project → Settings → Environment Variables:
 ```
-NEXT_PUBLIC_API_URL = https://omlivestream-api.onrender.com/api/v1
-NEXT_PUBLIC_SOCKET_URL = https://omlivestream-api.onrender.com
+NEXT_PUBLIC_API_URL = https://omlivestream.onrender.com/api/v1
+NEXT_PUBLIC_SOCKET_URL = https://omlivestream.onrender.com
 ```
 Then redeploy the frontend.
 
@@ -131,7 +131,7 @@ https://omlivestream-api.onrender.com/api/docs
 ## Step 6 — Paystack webhook
 
 In Paystack Dashboard → Settings → API Keys & Webhooks:
-- Webhook URL: `https://omlivestream-api.onrender.com/api/v1/billing/webhooks/paystack`
+- Webhook URL: `https://omlivestream.onrender.com/api/v1/billing/webhooks/paystack`
 - Events to listen for: `charge.success`, `subscription.create`, `subscription.disable`, `invoice.create`, `invoice.payment_failed`
 
 ---

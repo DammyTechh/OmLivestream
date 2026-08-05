@@ -2,11 +2,11 @@ services:
   # ── Main API ──────────────────────────────────────────────────────
   - type: web
     name: omlivestreambackend-api
-    runtime: node
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     region: oregon           # or frankfurt if your users are in Europe/Africa
-    plan: free               # ← free tier works for MVP; upgrade to Starter ($7/mo) when you need always-on
-    buildCommand: npm install && npm run build
-    startCommand: node dist/server.js
+    plan: starter            # ← $7/mo required for Docker builds (free tier doesn't support Docker)
     healthCheckPath: /health
     autoDeploy: true         # auto-deploys on git push to main
 
