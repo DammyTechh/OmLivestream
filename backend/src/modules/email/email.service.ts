@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { env } from '../../config/env';
+import { env, urls } from '../../config/env';
 import { logger } from '../../config/logger';
 
 const resend = new Resend(env.RESEND_API_KEY);
@@ -25,6 +25,10 @@ const wrap = (body: string) => `<!DOCTYPE html><html><head>
 </td></tr>
 ${body}
 <tr><td style="padding:20px 40px;border-top:1px solid rgba(124,58,237,0.15);text-align:center;">
+  <p style="color:${muted};font-size:12px;margin:0 0 8px;">
+    Need help? <a href="mailto:${env.SUPPORT_EMAIL}" style="color:#A855F7;text-decoration:none;">${env.SUPPORT_EMAIL}</a>
+    &nbsp;•&nbsp; Sales: <a href="mailto:${env.SALES_EMAIL}" style="color:#A855F7;text-decoration:none;">${env.SALES_EMAIL}</a>
+  </p>
   <p style="color:${muted};font-size:12px;margin:0;">© ${new Date().getFullYear()} OmliveStream. All rights reserved.</p>
 </td></tr>
 </table></td></tr></table></body></html>`;
@@ -41,7 +45,9 @@ export class EmailService {
 
   private async send(to: string, subject: string, html: string): Promise<void> {
     try {
-      await resend.emails.send({ from: this.from, to, subject, html });
+      // reply_to so a user replying to an automated email reaches a human
+      // inbox instead of the unmonitored no-reply sender.
+      await resend.emails.send({ from: this.from, reply_to: env.SUPPORT_EMAIL, to, subject, html });
       logger.info({ to, subject }, 'Email sent');
     } catch (err) {
       logger.error({ err, to, subject }, 'Email failed — non-fatal, continuing');
@@ -74,7 +80,7 @@ export class EmailService {
         <li><strong style="color:${text};">Create a stream</strong> — title, thumbnail, select platforms</li>
         <li><strong style="color:${text};">Go Live!</strong> — reach your entire audience simultaneously</li>
       </ol>
-      ${btn(`${env.FRONTEND_URL}/dashboard`, 'Go to Dashboard →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Go to Dashboard →')}
     </td></tr>`);
     await this.send(to, '🎉 Welcome to OmliveStream — your account is ready!', html);
   }
@@ -93,7 +99,7 @@ export class EmailService {
         ${row('Reference', `<span style="font-family:monospace;font-size:12px;">${d.reference}</span>`)}
         ${row('Date', new Date().toLocaleDateString('en-NG', { dateStyle: 'long' }))}
       </table>
-      ${btn(`${env.FRONTEND_URL}/dashboard`, 'Go to Dashboard →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Go to Dashboard →')}
     </td></tr>`);
     await this.send(to, `OmliveStream — Payment confirmed: ${amount}`, html);
   }
@@ -105,7 +111,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Subscription Cancelled</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 12px;">Your subscription has been cancelled. Premium access continues until <strong style="color:${text};">${endDate}</strong>.</p>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 28px;">You can resubscribe any time from your billing settings.</p>
-      ${btn(`${env.FRONTEND_URL}/billing`, 'Resubscribe →')}
+      ${btn(`${urls.payment}/billing`, 'Resubscribe →')}
     </td></tr>`);
     await this.send(to, 'OmliveStream — Subscription cancelled', html);
   }
@@ -116,7 +122,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">🎬 Your recording is ready!</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 8px;">Your stream <strong style="color:${text};">"${streamTitle}"</strong> has been saved successfully.</p>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 28px;">Download, AI-edit, or publish directly to your platforms.</p>
-      ${btn(`${env.FRONTEND_URL}/recordings`, 'View Recording →')}
+      ${btn(`${urls.dashboard}/recordings`, 'View Recording →')}
     </td></tr>`);
     await this.send(to, `Recording ready: "${streamTitle}"`, html);
   }
@@ -127,7 +133,7 @@ export class EmailService {
       <div style="font-size:56px;margin-bottom:12px;">🎂</div>
       <h2 style="color:${text};font-size:24px;font-weight:800;margin:0 0 12px;">Happy Birthday, ${name || 'Creator'}!</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 28px;">Wishing you an amazing day from the whole OmliveStream team. Go celebrate — and maybe stream it!</p>
-      ${btn(`${env.FRONTEND_URL}/dashboard`, 'Start a Birthday Stream')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Start a Birthday Stream')}
     </td></tr>`);
     await this.send(to, '🎂 Happy Birthday from OmliveStream!', html);
   }
@@ -138,7 +144,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">👀 Your audience misses you, ${name || 'Creator'}!</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 12px;">You haven't streamed in 5 days. Your followers across all your connected platforms are waiting.</p>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 28px;">Consistency is what builds an audience. Even a short stream keeps the momentum going.</p>
-      ${btn(`${env.FRONTEND_URL}/dashboard`, 'Go Live Now →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Go Live Now →')}
     </td></tr>`);
     await this.send(to, `👀 ${name || 'Creator'}, your audience misses you!`, html);
   }
@@ -158,7 +164,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">🔄 Subscription Renewed</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 8px;">Your <strong style="color:${text};">${plan}</strong> plan has been renewed successfully.</p>
       <p style="color:${muted};font-size:14px;margin:0 0 28px;">Next billing date: <strong style="color:${text};">${new Date(nextBillingDate).toLocaleDateString('en-NG', { dateStyle: 'long' })}</strong></p>
-      ${btn(`${env.FRONTEND_URL}/billing`, 'View Billing →')}
+      ${btn(`${urls.payment}/billing`, 'View Billing →')}
     </td></tr>`);
     await this.send(to, 'OmliveStream — Subscription renewed', html);
   }
@@ -169,7 +175,7 @@ export class EmailService {
       <span style="display:inline-block;background:rgba(124,58,237,0.15);color:#A855F7;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:4px 12px;border-radius:99px;margin-bottom:16px;">New Feature</span>
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">${title}</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 28px;">${description}</p>
-      ${btn(`${env.FRONTEND_URL}/dashboard`, 'Try It Now →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Try It Now →')}
     </td></tr>`);
     await this.send(to, `✨ New on OmliveStream: ${title}`, html);
   }
@@ -188,7 +194,7 @@ export class EmailService {
         ${row('Device', d.userAgent.slice(0, 60) + (d.userAgent.length > 60 ? '…' : ''))}
       </table>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 24px;">If this was you, no action needed. If not, secure your account immediately.</p>
-      ${btn(`${env.FRONTEND_URL}/settings/security`, 'Secure My Account →')}
+      ${btn(`${urls.dashboard}/settings/security`, 'Secure My Account →')}
     </td></tr>`);
     await this.send(to, 'New device sign-in to your OmliveStream account', html);
   }
@@ -206,7 +212,7 @@ export class EmailService {
         ${row('Access Until', endDate)}
       </table>
       <p style="color:${muted};font-size:14px;margin:0 0 28px;">Full access — comment replies, AI editing, 8 platforms, analytics.</p>
-      ${btn(`${env.FRONTEND_URL}/dashboard`, 'Start Streaming →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Start Streaming →')}
     </td></tr>`);
     await this.send(to, '🌟 Your OmliveStream Premium is active!', html);
   }
@@ -252,7 +258,7 @@ export class EmailService {
         <p style="font-family:'Courier New',monospace;font-size:22px;font-weight:700;color:${text};letter-spacing:3px;margin:0 0 8px;">${d.sixMonthCode}</p>
         <p style="color:${muted};font-size:13px;margin:0;">Half price for 6 months</p>
       </div>
-      ${btn(`${env.FRONTEND_URL}/dashboard`, 'Start Streaming →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Start Streaming →')}
       <p style="color:${muted};font-size:12px;margin:16px 0 0;">Codes expire in 90 days. Apply via Settings → Billing → Apply Code.</p>
     </td></tr>`);
     await this.send(to, '🎁 Your OmliveStream waitlist rewards — codes inside', html);
@@ -269,7 +275,7 @@ export class EmailService {
         ${row('Premium', 'All 8 platforms, comment replies, unlimited')}
       </table>
       <p style="color:${muted};font-size:14px;margin:0 0 24px;">Upgrade now to keep streaming to multiple platforms without interruption.</p>
-      ${btn(`${env.FRONTEND_URL}/billing`, 'Upgrade to Premium →')}
+      ${btn(`${urls.payment}/billing`, 'Upgrade to Premium →')}
     </td></tr>`);
     await this.send(to, `⏳ Your OmliveStream trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''} — don't lose access`, html);
   }
@@ -280,7 +286,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Your free trial has ended</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 20px;">Hey ${name || 'Creator'}, your 90-day trial is over. You're now on the Free plan — you can still stream to 1 platform.</p>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 28px;">Upgrade to Premium to stream on all 8 platforms, reply to comments, and get unlimited streams.</p>
-      ${btn(`${env.FRONTEND_URL}/billing`, 'Upgrade to Premium →')}
+      ${btn(`${urls.payment}/billing`, 'Upgrade to Premium →')}
     </td></tr>`);
     await this.send(to, 'Your OmliveStream trial has ended — upgrade to keep full access', html);
   }

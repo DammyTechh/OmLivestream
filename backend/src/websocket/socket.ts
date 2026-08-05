@@ -1,7 +1,7 @@
 import { Server as IO, Socket } from 'socket.io';
 import http from 'http';
 import jwt from 'jsonwebtoken';
-import { env } from '../config/env';
+import { env, corsAllowedOrigins } from '../config/env';
 import { redis, REDIS_KEYS } from '../config/redis';
 import { supabaseAdmin } from '../config/supabase';
 import { logger } from '../config/logger';
@@ -13,7 +13,9 @@ type AuthSocket = Socket & { userId: string; userPlan: string };
 export function initSocketIO(httpServer: http.Server): IO {
   const io = new IO(httpServer, {
     cors: {
-      origin:      env.FRONTEND_URL,
+      // Same allowlist as the REST API — dashboard.* connects over WS too,
+      // so a single FRONTEND_URL here would reject every subdomain.
+      origin:      corsAllowedOrigins,
       methods:     ['GET', 'POST'],
       credentials: true,
     },

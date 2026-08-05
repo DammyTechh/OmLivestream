@@ -12,7 +12,23 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(3001),
   HOST: z.string().default('0.0.0.0'),
   API_BASE_URL: z.string().url(),
-  FRONTEND_URL: z.string().url(),
+
+  // ── Public surfaces ───────────────────────────────────────────────
+  // FRONTEND_URL is the canonical marketing site and the base for links
+  // in emails. Each app surface has its own subdomain.
+  FRONTEND_URL:  z.string().url(),
+  DASHBOARD_URL: z.string().url().optional(),
+  ADMIN_URL:     z.string().url().optional(),
+  PAYMENT_URL:   z.string().url().optional(),
+
+  // Comma-separated list of browser origins allowed to call this API.
+  // Kept separate from FRONTEND_URL so the allowlist can include the
+  // Vercel URL and localhost without polluting canonical email links.
+  CORS_ALLOWED_ORIGINS: z.string().optional().default(''),
+
+  // ── Official contact addresses ────────────────────────────────────
+  SUPPORT_EMAIL: z.string().email().default('support@omlivestream.com'),
+  SALES_EMAIL:   z.string().email().default('sales@omlivestream.com'),
 
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
@@ -92,3 +108,42 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 export type Env = typeof env;
+
+// ── Derived URLs ────────────────────────────────────────────────────
+// The subdomain vars are optional so local dev keeps working with a
+// single localhost origin. Fall back to FRONTEND_URL when unset.
+export const urls = {
+  site:      env.FRONTEND_URL,
+  dashboard: env.DASHBOARD_URL ?? env.FRONTEND_URL,
+  admin:     env.ADMIN_URL     ?? env.FRONTEND_URL,
+  payment:   env.PAYMENT_URL   ?? env.FRONTEND_URL,
+} as const;
+
+// ── CORS allowlist ──────────────────────────────────────────────────
+// Every browser-facing origin that may call this API. Built from the
+// explicit CORS_ALLOWED_ORIGINS list plus all known app surfaces, so a
+// missing entry in one place can't silently break a subdomain.
+export const corsAllowedOrigins: string[] = Array.from(
+  new Set(
+    [
+      ...env.CORS_ALLOWED_ORIGINS.split(',').map((o) => o.trim()),
+      env.FRONTEND_URL,
+      env.DASHBOARD_URL,
+      env.ADMIN_URL,
+      env.PAYMENT_URL,
+      ...(env.NODE_ENV !== 'production'
+        ? ['http://localhost:3000', 'http://localhost:3001']
+        : []),
+    ]
+      .filter((o): o is string => Boolean(o))
+      // Normalise: origins never carry a trailing slash or a path.
+      .map((o) => {
+        try {
+          return new URL(o).origin;
+        } catch {
+          return '';
+        }
+      })
+      .filter(Boolean),
+  ),
+);

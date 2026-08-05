@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { supabaseAdmin } from '../../config/supabase';
-import { env } from '../../config/env';
+import { env, urls } from '../../config/env';
 import { authenticate, validatePaystackWebhook } from '../../middleware/auth';
 import { getAuthUser } from '../../utils/jwt';
 import { sendSuccess } from '../../utils/response';
@@ -74,7 +74,7 @@ export async function billingRoutes(fastify: FastifyInstance): Promise<void> {
 
       const body: Record<string, unknown> = {
         email: profile?.email ?? u.email, amount: cfg.amount, currency: cfg.currency, reference,
-        callback_url: `${env.FRONTEND_URL}/billing/callback`,
+        callback_url: `${urls.payment}/callback`,
         metadata: { userId: u.id, plan, billingCycle, paymentMethod, discountCode: discountCode || null },
       };
 

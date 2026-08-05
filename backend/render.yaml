@@ -22,9 +22,25 @@ services:
       # Render Dashboard → Your Service → Environment → Add Environment Variable
 
       - key: API_BASE_URL
-        sync: false          # fill in after first deploy: https://omlivestreambackend-api.onrender.com
+        sync: false          # fill in after first deploy: https://api.omlivestream.com
       - key: FRONTEND_URL
-        sync: false          # your Vercel frontend URL: https://omlivestream.vercel.app
+        sync: false          # marketing site: https://www.omlivestream.com
+      - key: DASHBOARD_URL
+        sync: false          # user dashboard: https://dashboard.omlivestream.com
+      - key: ADMIN_URL
+        sync: false          # admin panel: https://admin.omlivestream.com
+      - key: PAYMENT_URL
+        sync: false          # payment/billing: https://payment.omlivestream.com
+
+      # ── CORS origins (comma-separated, no spaces) ──────────────────
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false          # https://omlivestream.com,https://www.omlivestream.com,https://om-livestream.vercel.app
+
+      # ── Official contact addresses ──────────────────────────────────
+      - key: SUPPORT_EMAIL
+        value: support@omlivestream.com
+      - key: SALES_EMAIL
+        value: sales@omlivestream.com
 
       - key: SUPABASE_URL
         sync: false

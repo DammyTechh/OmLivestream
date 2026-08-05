@@ -8,7 +8,7 @@ import fastifySwagger     from '@fastify/swagger';
 import fastifySwaggerUi   from '@fastify/swagger-ui';
 
 
-import { env }            from './config/env';
+import { env, corsAllowedOrigins } from './config/env';
 import { logger }         from './config/logger';
 import { AppError }       from './utils/errors';
 import { sendError }      from './utils/response';
@@ -60,21 +60,29 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // ── CORS ─────────────────────────────────────────────────────────
-  // Support comma-separated FRONTEND_URL list for Vercel previews
-  const allowedOrigins = env.FRONTEND_URL.split(',').map((u) => u.trim()).filter(Boolean);
+  // Origins come from config/env (CORS_ALLOWED_ORIGINS + every known
+  // app subdomain), already normalised to scheme://host[:port].
+  //
+  // Two things matter here:
+  //  1. Never pass an Error to the callback. Doing so makes @fastify/cors
+  //     throw into the global error handler, which answers the OPTIONS
+  //     preflight with 500 and no CORS headers — the browser then reports
+  //     a generic "CORS error" that looks nothing like the real cause.
+  //     Rejecting is `cb(null, false)`: no headers, clean 200 preflight.
+  //  2. Match origins exactly. `origin.startsWith(allowed)` would let
+  //     https://omlivestream.com.attacker.test through.
   await app.register(fastifyCors, {
-    origin: env.NODE_ENV === 'production'
-      ? (origin, cb) => {
-          if (!origin || allowedOrigins.some((o) => origin.startsWith(o) || origin === o)) {
-            cb(null, true);
-          } else {
-            cb(new Error('Not allowed by CORS'), false);
-          }
-        }
-      : [env.FRONTEND_URL, 'http://localhost:3000', 'http://localhost:3001'],
+    origin: (origin, cb) => {
+      // Same-origin/non-browser callers (curl, health checks, server-to-
+      // server) send no Origin header — nothing to authorise.
+      if (!origin) return cb(null, true);
+      cb(null, corsAllowedOrigins.includes(origin));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    // Cache the preflight for 24h so the browser stops re-asking.
+    maxAge: 86400,
   });
 
   // ── Rate limiting ────────────────────────────────────────────────
@@ -128,7 +136,7 @@ Multi-platform live streaming SaaS backend — stream to 8+ platforms simultaneo
 - Auth endpoints: **5 req / 15 min** per IP
 - API endpoints: **100 req / min** per user
         `,
-        contact: { name: 'OmliveStream Dev', email: 'dev@omlivestream.com' },
+        contact: { name: 'OmliveStream Support', email: env.SUPPORT_EMAIL, url: env.FRONTEND_URL },
         license: { name: 'MIT' },
       },
       servers: [

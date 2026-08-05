@@ -6,7 +6,7 @@ import { getAuthUser } from '../../utils/jwt';
 import { sendSuccess, sendNoContent } from '../../utils/response';
 import { generateToken } from '../../utils/crypto';
 import { redis, REDIS_KEYS } from '../../config/redis';
-import { env } from '../../config/env';
+import { env, urls } from '../../config/env';
 import type { Platform } from '../../types/database';
 
 const svc = new PlatformsService();
@@ -30,7 +30,7 @@ export async function platformsRoutes(fastify: FastifyInstance): Promise<void> {
     if (!userId) return reply.status(400).send({ success: false, error: { code: 'INVALID_STATE', message: 'OAuth state invalid or expired' } });
     await redis.del(REDIS_KEYS.OAUTH_STATE(state));
     await svc.handleOAuthCallback(platform as Platform, code, userId as string);
-    reply.redirect(`${env.FRONTEND_URL}/settings/platforms?connected=${platform}`);
+    reply.redirect(`${urls.dashboard}/settings/platforms?connected=${platform}`);
   });
 
   // All routes below require auth
