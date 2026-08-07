@@ -110,7 +110,7 @@ export function AIFeatures() {
             </div>
             <div className="space-y-2">
               {[
-                'Ranked Grind to Immortal — Drop Any Tips? 🔥',
+                'Ranked Grind to Immortal — Drop Any Tips?',
                 "Clutch or Kick — It's Friday Night Valorant",
                 'First to Radiant Challenge — Day 3 (feat. Viewers)',
                 'New Agent Tier List After 100 Games',

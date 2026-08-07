@@ -6,6 +6,7 @@ import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianG
 import { Card } from '@/components/ui/Card';
 import { api } from '@/lib/api';
 import { formatCurrency, formatNumber } from '@/lib/utils';
+import { palette, chartAxis, chartTooltip } from '@/lib/theme';
 
 interface DashboardStats {
   users?: {
@@ -48,10 +49,10 @@ export default function AdminDashboardPage() {
   }, []);
 
   const kpiCards = [
-    { label: 'Total users',  value: formatNumber(stats.users?.total ?? 0),   icon: Users,      color: '#A855F7' },
-    { label: 'Premium',      value: formatNumber(stats.users?.premium ?? 0),  icon: TrendingUp, color: '#10B981' },
-    { label: 'Revenue',      value: stats.revenue?.totalFormatted ?? formatCurrency(0), icon: CreditCard, color: '#EC4899' },
-    { label: 'Live streams', value: formatNumber(stats.streams?.live ?? 0),   icon: Radio,      color: '#F59E0B' },
+    { label: 'Total users',  value: formatNumber(stats.users?.total ?? 0),   icon: Users,      color: palette.primary },
+    { label: 'Premium',      value: formatNumber(stats.users?.premium ?? 0),  icon: TrendingUp, color: palette.success },
+    { label: 'Revenue',      value: stats.revenue?.totalFormatted ?? formatCurrency(0), icon: CreditCard, color: palette.accent },
+    { label: 'Live streams', value: formatNumber(stats.streams?.live ?? 0),   icon: Radio,      color: palette.warning },
   ];
 
   // Normalise chart keys — backend returns { date, amount } and { date, total }
@@ -92,15 +93,15 @@ export default function AdminDashboardPage() {
               <AreaChart data={revenueData}>
                 <defs>
                   <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%"   stopColor="#EC4899" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#EC4899" stopOpacity={0}   />
+                    <stop offset="0%"   stopColor={palette.accent} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={palette.accent} stopOpacity={0}   />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="day" stroke="#8B87A6" fontSize={11} />
-                <YAxis stroke="#8B87A6" fontSize={11} />
-                <Tooltip contentStyle={{ background: '#14102A', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 12 }} />
-                <Area type="monotone" dataKey="amount" stroke="#EC4899" fill="url(#rev)" strokeWidth={2} />
+                <CartesianGrid strokeDasharray={chartAxis.gridDash} stroke={chartAxis.gridStroke} />
+                <XAxis dataKey="day" stroke={chartAxis.stroke} fontSize={11} />
+                <YAxis stroke={chartAxis.stroke} fontSize={11} />
+                <Tooltip contentStyle={chartTooltip} />
+                <Area type="monotone" dataKey="amount" stroke={palette.accent} fill="url(#rev)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -113,15 +114,15 @@ export default function AdminDashboardPage() {
               <AreaChart data={growthData}>
                 <defs>
                   <linearGradient id="grw" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%"   stopColor="#A855F7" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="#A855F7" stopOpacity={0}   />
+                    <stop offset="0%"   stopColor={palette.primary} stopOpacity={0.4} />
+                    <stop offset="100%" stopColor={palette.primary} stopOpacity={0}   />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="day" stroke="#8B87A6" fontSize={11} />
-                <YAxis stroke="#8B87A6" fontSize={11} />
-                <Tooltip contentStyle={{ background: '#14102A', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 12 }} />
-                <Area type="monotone" dataKey="count" stroke="#A855F7" fill="url(#grw)" strokeWidth={2} />
+                <CartesianGrid strokeDasharray={chartAxis.gridDash} stroke={chartAxis.gridStroke} />
+                <XAxis dataKey="day" stroke={chartAxis.stroke} fontSize={11} />
+                <YAxis stroke={chartAxis.stroke} fontSize={11} />
+                <Tooltip contentStyle={chartTooltip} />
+                <Area type="monotone" dataKey="count" stroke={palette.primary} fill="url(#grw)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>

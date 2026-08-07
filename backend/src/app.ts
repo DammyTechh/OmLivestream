@@ -9,7 +9,7 @@ import fastifySwaggerUi   from '@fastify/swagger-ui';
 
 
 import { env, corsAllowedOrigins } from './config/env';
-import { redis }          from './config/redis';
+import { redis, createRateLimitRedis } from './config/redis';
 import { logger }         from './config/logger';
 import { AppError }       from './utils/errors';
 import { sendError }      from './utils/response';
@@ -86,12 +86,60 @@ export async function buildApp(): Promise<FastifyInstance> {
     maxAge: 86400,
   });
 
+  // ── Response compression ─────────────────────────────────────────
+  // Registered after CORS so preflights are answered before we bother
+  // negotiating an encoding, and before the routes so every JSON payload
+  // passes through it. The analytics and dashboard responses are the ones
+  // that matter: highly repetitive JSON, which gzip takes down by roughly
+  // an order of magnitude. On a metered egress plan with thousands of
+  // dashboard polls that is the single cheapest win available.
+  //
+  // Loaded defensively so a missing dependency degrades to uncompressed
+  // responses instead of refusing to boot.
+  try {
+    const fastifyCompress = require('@fastify/compress');
+    await app.register(fastifyCompress, {
+      global:    true,
+      encodings: ['gzip', 'deflate'],
+      // Below ~1 KB the header and CPU cost outweigh the saving, and tiny
+      // JSON acks are most of our traffic by count.
+      threshold: 1024,
+    });
+  } catch (err) {
+    logger.warn({ err }, 'Response compression unavailable — run `npm install`. Serving uncompressed.');
+  }
+
   // ── Rate limiting ────────────────────────────────────────────────
+  // Backed by Redis when a TCP URL is available, so the limit is shared
+  // across instances. With the default in-process store, N instances behind
+  // a load balancer each keep their own counter and the effective limit
+  // becomes N × the configured value — which is exactly the point at which
+  // a rate limit stops being one. The store also stops per-IP counters from
+  // accumulating in each instance's heap.
+  const rateLimitRedis = createRateLimitRedis();
+  if (!rateLimitRedis) {
+    logger.warn(
+      'Rate limiting is per-instance (UPSTASH_REDIS_URL unset). Running multiple ' +
+      'instances multiplies every configured limit by the instance count.',
+    );
+  }
+
   await app.register(fastifyRateLimit, {
     global:     true,
     max:        env.RATE_LIMIT_API_MAX,
     timeWindow: env.RATE_LIMIT_API_WINDOW_MS,
-    keyGenerator: (req) => (req.headers['x-forwarded-for'] as string) ?? req.ip,
+    ...(rateLimitRedis ? { redis: rateLimitRedis } : {}),
+    // Namespaced so rate-limit keys cannot collide with BullMQ's or the
+    // Socket.io adapter's keys in the same database.
+    nameSpace: 'omls-rl:',
+    // A spoofable header, but it is the only way to see the real client
+    // behind Render's proxy. Take the first hop — the proxy appends, so
+    // later entries are attacker-controlled.
+    keyGenerator: (req) => {
+      const xff = req.headers['x-forwarded-for'];
+      const first = Array.isArray(xff) ? xff[0] : xff?.split(',')[0];
+      return first?.trim() || req.ip;
+    },
     errorResponseBuilder: (_req, ctx) => ({
       success: false,
       error: { code: 'TOO_MANY_REQUESTS', message: `Rate limit hit. Retry in ${Math.ceil(ctx.ttl / 1000)}s.` },

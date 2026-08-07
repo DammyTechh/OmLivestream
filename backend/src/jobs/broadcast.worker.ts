@@ -25,6 +25,17 @@ const resend = new Resend(env.RESEND_API_KEY);
 const BATCH_SIZE  = 50;
 const BATCH_DELAY = 200; // ms between batches — stay within Resend rate limit
 
+/**
+ * Safety stop for the drain loop below.
+ *
+ * The loop repeatedly asks for "the next page of pending recipients" and
+ * relies on each pass marking those rows sent or failed. If an update ever
+ * silently no-ops, the same page would come back forever and the worker
+ * would spin sending duplicate email. This bounds it at a campaign of
+ * 500k recipients, far above any real segment.
+ */
+const MAX_BATCHES = 10_000;
+
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const broadcastWorker = new Worker('broadcast-email', async (job) => {
@@ -56,10 +67,12 @@ const broadcastWorker = new Worker('broadcast-email', async (job) => {
   // Handle 'send-broadcast' job — actual email delivery
   if (job.name !== 'send-broadcast') return;
 
-  // Fetch the broadcast content
+  // Fetch the broadcast content. Named columns rather than '*': body_html on
+  // a long campaign is the largest single value in this table, and the rest
+  // of the row is never read here.
   const { data: broadcast, error: bErr } = await supabaseAdmin
     .from('admin_broadcasts')
-    .select('*')
+    .select('subject, body_html, body_text')
     .eq('id', broadcastId)
     .single();
 
@@ -68,26 +81,54 @@ const broadcastWorker = new Worker('broadcast-email', async (job) => {
     return;
   }
 
-  // Get all pending recipients
-  const { data: pendingLogs } = await supabaseAdmin
+  // How many recipients are waiting, for progress logging only. head: true
+  // so this does not pull the rows themselves.
+  const { count: pendingTotal } = await supabaseAdmin
     .from('broadcast_logs')
-    .select('id, user_id, email')
+    .select('id', { count: 'exact', head: true })
     .eq('broadcast_id', broadcastId)
     .eq('status', 'pending');
 
-  const recipients = pendingLogs ?? [];
-  logger.info({ broadcastId, recipientCount: recipients.length }, 'Starting email delivery');
+  const total = pendingTotal ?? 0;
+  logger.info({ broadcastId, recipientCount: total }, 'Starting email delivery');
 
   let sentCount   = 0;
   let failedCount = 0;
+  let batches     = 0;
 
-  // Send in batches of BATCH_SIZE
-  for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-    const batch = recipients.slice(i, i + BATCH_SIZE);
+  // Drain one page at a time rather than loading every recipient up front.
+  // A 5,000-person campaign previously sat as 5,000 rows in the worker's heap
+  // for the whole run; this holds BATCH_SIZE of them. Each pass takes the
+  // rows that are still pending, so the query itself is the cursor — no
+  // offset to skew as rows change status underneath it.
+  for (;;) {
+    if (++batches > MAX_BATCHES) {
+      logger.error({ broadcastId, sentCount, failedCount },
+        'Broadcast exceeded MAX_BATCHES — stopping. Pending rows were not transitioning; check broadcast_logs.');
+      break;
+    }
 
-    await Promise.allSettled(batch.map(async (recipient) => {
+    const { data: page, error: pageErr } = await supabaseAdmin
+      .from('broadcast_logs')
+      .select('id, user_id, email')
+      .eq('broadcast_id', broadcastId)
+      .eq('status', 'pending')
+      .order('id', { ascending: true })
+      .limit(BATCH_SIZE);
+
+    if (pageErr) {
+      logger.error({ broadcastId, err: pageErr }, 'Could not read next recipient page — aborting run');
+      break;
+    }
+    if (!page?.length) break;
+
+    const sentIds: string[] = [];
+    // Grouped by message so identical failures collapse into one statement;
+    // the error text is stored per row, so it has to be part of the key.
+    const failedByError = new Map<string, string[]>();
+
+    await Promise.allSettled(page.map(async (recipient) => {
       try {
-        // Send via Resend
         await resend.emails.send({
           from:    env.EMAIL_FROM,
           to:      recipient.email,
@@ -99,46 +140,69 @@ const broadcastWorker = new Worker('broadcast-email', async (job) => {
             'X-User-ID':      recipient.user_id,
           },
         });
-
-        // Mark delivered
-        await supabaseAdmin.from('broadcast_logs').update({
-          status:  'sent',
-          sent_at: new Date().toISOString(),
-        }).eq('id', recipient.id);
-
-        sentCount++;
+        sentIds.push(recipient.id);
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
+        const errMsg = (err instanceof Error ? err.message : String(err)).slice(0, 500);
         logger.warn({ broadcastId, email: recipient.email, err: errMsg }, 'Email delivery failed');
-
-        // Mark failed with error
-        await supabaseAdmin.from('broadcast_logs').update({
-          status: 'failed',
-          error:  errMsg.slice(0, 500),
-        }).eq('id', recipient.id);
-
-        failedCount++;
+        const ids = failedByError.get(errMsg);
+        if (ids) ids.push(recipient.id);
+        else failedByError.set(errMsg, [recipient.id]);
       }
     }));
 
-    // Update live stats on broadcast row after each batch
+    const now = new Date().toISOString();
+
+    // One UPDATE for every success in the batch, and one per distinct error,
+    // instead of one per recipient. At 50 per batch that is up to 50 round
+    // trips collapsed into typically one.
+    //
+    // These must complete before the next iteration queries for pending rows,
+    // otherwise the same recipients would be selected and emailed again.
+    // Promise.resolve() around each builder: PostgREST's query builder is
+    // thenable but not a Promise, so it has no .catch and cannot go straight
+    // into Promise.all's typed signature.
+    const writes: Promise<unknown>[] = [];
+    if (sentIds.length) {
+      writes.push(Promise.resolve(supabaseAdmin.from('broadcast_logs')
+        .update({ status: 'sent', sent_at: now })
+        .in('id', sentIds)));
+    }
+    for (const [errMsg, ids] of failedByError) {
+      writes.push(Promise.resolve(supabaseAdmin.from('broadcast_logs')
+        .update({ status: 'failed', error: errMsg })
+        .in('id', ids)));
+    }
+
+    const results = await Promise.all(writes.map(w => w.then(
+      (r: any) => r?.error ?? null,
+      (e: unknown) => e,
+    )));
+    const writeErr = results.find(r => r !== null && r !== undefined);
+    if (writeErr) {
+      // Bail rather than loop: if the status never changes, the next query
+      // returns the same page and those people get a second email.
+      logger.error({ broadcastId, err: writeErr },
+        'Could not record delivery status — stopping to avoid re-sending this batch');
+      break;
+    }
+
+    sentCount   += sentIds.length;
+    failedCount += page.length - sentIds.length;
+
     await supabaseAdmin.from('admin_broadcasts').update({
       sent_count:   sentCount,
       failed_count: failedCount,
-      updated_at:   new Date().toISOString(),
+      updated_at:   now,
     }).eq('id', broadcastId);
-
-    // Rate-limit delay between batches (skip on last batch)
-    if (i + BATCH_SIZE < recipients.length) {
-      await delay(BATCH_DELAY);
-    }
 
     logger.debug({
       broadcastId,
-      progress:    `${Math.min(i + BATCH_SIZE, recipients.length)}/${recipients.length}`,
+      progress: `${sentCount + failedCount}/${total}`,
       sentCount,
       failedCount,
     }, 'Batch complete');
+
+    if (page.length === BATCH_SIZE) await delay(BATCH_DELAY);
   }
 
   // Mark broadcast as sent
@@ -152,11 +216,11 @@ const broadcastWorker = new Worker('broadcast-email', async (job) => {
 
   logger.info({
     broadcastId,
-    total:   recipients.length,
+    total,
     sent:    sentCount,
     failed:  failedCount,
     subject: broadcast.subject,
-  }, '✅ Broadcast complete');
+  }, 'Broadcast complete');
 
 }, {
   connection:  createBullConnection(),
@@ -179,5 +243,5 @@ broadcastWorker.on('completed', (job) => {
   logger.info({ jobId: job.id }, 'Broadcast job completed');
 });
 
-logger.info('📬 Broadcast email worker started');
+logger.info('Broadcast email worker started');
 export { broadcastWorker };

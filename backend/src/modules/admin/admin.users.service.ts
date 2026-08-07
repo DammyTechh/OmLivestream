@@ -223,36 +223,42 @@ export class AdminUsersService {
   }
 
   // ── Multi-account detection (same device, different emails) ──────
+  /**
+   * Device fingerprints seen on more than one account.
+   *
+   * This previously selected the entire login_logs table — every login by
+   * every user, each with a joined users row — grouped it into an object in
+   * Node, and then paginated the result with Array.slice. Three consequences:
+   * asking for page 1 cost exactly as much as asking for page 50; the cost
+   * grew with total login history rather than with the number of suspects;
+   * and a busy month of logins could exhaust the heap on a small instance.
+   *
+   * The grouping, the >1 filter, the ordering and the pagination now all
+   * happen in Postgres, so what crosses the wire is one page of suspects.
+   */
   async getMultiAccountSuspects(opts: { page: number; limit: number }) {
-    // Find device fingerprints shared by more than one user
-    const { data, error } = await supabaseAdmin
-      .from('login_logs')
-      .select('device_fingerprint, user_id, users(email, full_name, status)')
-      .not('device_fingerprint', 'is', null)
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabaseAdmin.rpc('admin_multi_account_suspects', {
+      p_limit:  opts.limit,
+      p_offset: (opts.page - 1) * opts.limit,
+    });
 
     if (error) throw error;
 
-    // Group by device fingerprint and find those with multiple users
-    const fingerprints: Record<string, { fingerprint: string; users: { id: string; email: string; name: string }[] }> = {};
-    for (const log of data ?? []) {
-      const fp = log.device_fingerprint as string;
-      if (!fp) continue;
-      if (!fingerprints[fp]) fingerprints[fp] = { fingerprint: fp, users: [] };
-      const user = log.users as unknown as { email: string; full_name: string } | null;
-      if (user && !fingerprints[fp].users.find(u => u.id === log.user_id)) {
-        fingerprints[fp].users.push({ id: log.user_id, email: user.email, name: user.full_name ?? '' });
-      }
-    }
+    const result = (data ?? { total: 0, data: [] }) as {
+      total: number;
+      data: {
+        fingerprint: string;
+        userCount: number;
+        users: { id: string; email: string; name: string; status: string }[];
+      }[];
+    };
 
-    const suspects = Object.values(fingerprints)
-      .filter(f => f.users.length > 1)
-      .sort((a, b) => b.users.length - a.users.length);
-
-    const start = (opts.page - 1) * opts.limit;
     return {
-      data: suspects.slice(start, start + opts.limit),
-      total: suspects.length,
+      data: (result.data ?? []).map(r => ({
+        fingerprint: r.fingerprint,
+        users:       r.users ?? [],
+      })),
+      total: Number(result.total ?? 0),
     };
   }
 

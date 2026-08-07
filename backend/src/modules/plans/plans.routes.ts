@@ -4,7 +4,7 @@ import { authenticate } from '../../middleware/auth';
 import { getAuthUser } from '../../utils/jwt';
 import { sendSuccess } from '../../utils/response';
 import { supabaseAdmin } from '../../config/supabase';
-import { PlansService, PLAN_LIMITS } from './plans.service';
+import { PlansService, PLAN_LIMITS, buildUpgradePopup } from './plans.service';
 import { AppError } from '../../utils/errors';
 
 const plansSvc = new PlansService();
@@ -37,9 +37,11 @@ Returns everything the frontend needs to:
       security: [{ bearerAuth: [] }],
     },
   }, async (req: FastifyRequest, reply: FastifyReply) => {
-    const u    = getAuthUser(req);
-    const info = await plansSvc.getEffectivePlan(u.id);
-    const popup = await plansSvc.getUpgradePopup(u.id);
+    const u = getAuthUser(req);
+    // One read, not two. The popup is derived from the same plan state, and
+    // this endpoint runs on every dashboard load for every user.
+    const info  = await plansSvc.getEffectivePlan(u.id);
+    const popup = buildUpgradePopup(info);
     sendSuccess(reply, { ...info, popup });
   });
 
@@ -61,6 +63,11 @@ Returns everything the frontend needs to:
         ? { monthly: { amount: 500000, formatted: '₦5,000/mo' }, annual: { amount: 5000000, formatted: '₦50,000/yr', savingsPct: 17 } }
         : { monthly: null, annual: null },
     }));
+    // Derived entirely from a compile-time constant — identical for every
+    // user and every request. `private` because the response travels with an
+    // Authorization header and must not land in a shared proxy cache, even
+    // though the body happens to carry nothing user-specific.
+    reply.header('Cache-Control', 'private, max-age=3600');
     sendSuccess(reply, plans);
   });
 
@@ -103,8 +110,8 @@ Returns everything the frontend needs to:
       discountPct:  discount.discount_pct,
       freeMonths:   discount.free_months,
       message:      discount.discount_type === 'first_month_free'
-        ? '🎁 Your first month is free — use this code at checkout!'
-        : `💸 ${discount.discount_pct}% off your first 6 months — apply at checkout!`,
+        ? 'Your first month is free — use this code at checkout.'
+        : `${discount.discount_pct}% off your first 6 months — apply at checkout.`,
     }, 'Discount code applied');
   });
 }

@@ -206,19 +206,19 @@ export function analyseNetwork(params: {
 
   if (uploadMbps >= 8 && latencyMs < 50 && jitterMs < 20 && packetLossPercent < 0.5) {
     statusColor   = 'green';
-    statusMessage = '🟢 Excellent connection — broadcast quality streaming';
+    statusMessage = 'Excellent connection — broadcast quality streaming';
   } else if (uploadMbps >= 4 && latencyMs < 100 && jitterMs < 50 && packetLossPercent < 2) {
     statusColor   = 'green';
-    statusMessage = '🟢 Good connection — HD streaming ready';
+    statusMessage = 'Good connection — HD streaming ready';
   } else if (uploadMbps >= 2 && latencyMs < 150 && packetLossPercent < 3) {
     statusColor   = 'yellow';
-    statusMessage = '🟡 Fair connection — standard quality streaming';
+    statusMessage = 'Fair connection — standard quality streaming';
   } else if (uploadMbps >= 1) {
     statusColor   = 'orange';
-    statusMessage = '🟠 Weak connection — low quality streaming. Consider improving your network.';
+    statusMessage = 'Weak connection — low quality streaming. Consider improving your network.';
   } else {
     statusColor   = 'red';
-    statusMessage = '🔴 Very poor connection — streaming may be unstable';
+    statusMessage = 'Very poor connection — streaming may be unstable';
   }
 
   // Actionable tips based on measured values

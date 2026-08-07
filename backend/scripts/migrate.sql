@@ -103,9 +103,42 @@ create table if not exists stream_platforms (
   viewers_peak     integer not null default 0,
   impressions      integer not null default 0,
   total_comments   integer not null default 0,
+  -- Live-session identifiers, captured when the broadcast starts.
+  -- These are per-stream, not per-connection: YouTube mints a new
+  -- liveBroadcast (and with it a new liveChatId) for every go-live, and a
+  -- Facebook live video is single-use. Caching them on the connection row
+  -- would point every future stream at a dead object.
+  live_chat_id     text,
+  live_video_id    text,
   created_at       timestamptz not null default now()
 );
 create index if not exists idx_sp_stream on stream_platforms(stream_id);
+
+-- ── stream_comments ──────────────────────────────────────────────
+-- Live chat pulled in from every connected platform, unified into one
+-- feed. Persisted rather than only relayed over the socket so that a
+-- late-joining or reconnecting client can backfill, and so replies have a
+-- stable id to address.
+create table if not exists stream_comments (
+  id                  uuid primary key default uuid_generate_v4(),
+  stream_id           uuid not null references streams(id) on delete cascade,
+  platform            text not null,
+  -- The platform's own comment id. Unique per platform, so this is what
+  -- makes ingestion idempotent across a poller restart.
+  platform_comment_id text not null,
+  -- Where a reply must be sent, which is not always the comment id:
+  -- YouTube replies post into the live chat, Facebook onto the comment.
+  reply_target        text,
+  author_name         text,
+  author_platform_id  text,
+  text                text not null default '',
+  posted_at           timestamptz not null default now(),
+  replied_at          timestamptz,
+  reply_text          text,
+  created_at          timestamptz not null default now(),
+  unique (platform, platform_comment_id)
+);
+create index if not exists idx_sc_stream on stream_comments(stream_id, posted_at desc);
 
 -- ── recordings ───────────────────────────────────────────────────
 create table if not exists recordings (
@@ -228,6 +261,72 @@ create table if not exists user_feature_reads (
   read_at           timestamptz not null default now(),
   primary key (user_id, feature_update_id)
 );
+
+-- ================================================================
+-- In-place column additions for databases created before these
+-- columns existed. `create table if not exists` above is a no-op on
+-- an existing table, so new columns must also be added explicitly.
+-- `add column if not exists` makes this safe to re-run.
+-- ================================================================
+
+alter table stream_platforms add column if not exists live_chat_id  text;
+alter table stream_platforms add column if not exists live_video_id text;
+alter table stream_comments  enable row level security;
+
+-- analytics_overview filters on stream_id AND timestamp together. The two
+-- single-column indexes above force Postgres to pick one and filter the rest
+-- by hand, or to bitmap-and them. One composite index ordered the same way as
+-- the predicate lets it seek straight to the range, which is the difference
+-- between a scan and a lookup once a busy account has months of metrics.
+create index if not exists idx_metrics_stream_ts on stream_metrics(stream_id, timestamp);
+
+-- Comment ingestion upserts on (platform, platform_comment_id) on every poll
+-- of every platform of every live stream — the hottest write path in the
+-- system. The unique constraint already provides this index; named here so
+-- it is not "optimised away" by someone reading the table definition later.
+
+-- The birthday cron needs "whose birthday is today", which no index on `dob`
+-- can answer — the year differs for every row. Storing the month and day as
+-- generated columns makes it a plain indexed equality lookup instead of a
+-- full scan plus a filter in application code. Immutable and therefore
+-- indexable because `dob` is a date, not a timestamptz.
+alter table users add column if not exists birth_month smallint
+  generated always as (extract(month from dob)::smallint) stored;
+alter table users add column if not exists birth_day smallint
+  generated always as (extract(day from dob)::smallint) stored;
+create index if not exists idx_users_birthday on users(birth_month, birth_day)
+  where dob is not null;
+
+-- Supports the re-engagement cron, which filters on a "last activity"
+-- timestamp across the whole users table.
+--
+-- The matching index for the trial cron lives in migrate_v9_performance.sql,
+-- not here: it covers users.trial_expires_at, which migrate_v3.sql adds. A
+-- fresh database runs this file first, so naming that column here would abort
+-- the migration on a column that does not exist yet.
+create index if not exists idx_users_last_stream on users(last_stream_ended_at)
+  where last_stream_ended_at is not null;
+
+-- Per-user lookups that currently have no supporting index. Both are read on
+-- every billing dashboard load and every admin user detail view.
+create index if not exists idx_invoices_user      on invoices(user_id, created_at desc);
+create index if not exists idx_subscriptions_user on subscriptions(user_id);
+
+-- streams list view orders by created_at within a user; idx_streams_user_status
+-- covers the filter but not the sort, so Postgres still has to sort the result.
+create index if not exists idx_streams_user_created on streams(user_id, created_at desc);
+
+-- ================================================================
+-- Server-side aggregation functions
+-- ================================================================
+-- analytics_overview used to be defined here, taking uuid[] stream ids. It
+-- now takes a user id and does the ownership join itself, and lives in
+-- migrate_v9_performance.sql alongside the other aggregation functions.
+--
+-- Not left here as the old signature: this file is safe to re-run, so a
+-- re-run after v9 would recreate the uuid[] version as a second overload
+-- and leave two functions of the same name for PostgREST to choose between.
+-- v9 drops that signature if an earlier install created it.
 
 -- ================================================================
 -- Row Level Security (RLS)

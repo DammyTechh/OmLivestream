@@ -1,13 +1,66 @@
 import { supabaseAdmin } from '../../config/supabase';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 
+/**
+ * Columns returned by GET /users/me.
+ *
+ * Named explicitly rather than '*'. This is the most frequently called
+ * authenticated route in the app — the frontend loads it on every page —
+ * and '*' shipped the cron bookkeeping columns (birthday_wished_at,
+ * re_engagement_sent_at) and the generated birth_month/birth_day on every
+ * single request.
+ *
+ * It also means a column added by a later migration is invisible to clients
+ * until it is named here, which is the safer default for a table holding
+ * billing and moderation state.
+ *
+ * The embedded onboarding_responses row rides along on the same request —
+ * PostgREST resolves it through the foreign key, so this stays one round
+ * trip. See getProfile for why it is needed.
+ */
+const PROFILE_COLUMNS =
+  'id,email,full_name,dob,location,avatar_url,plan,is_verified,status,' +
+  'waitlist_member,waitlist_reward_claimed,trial_expires_at,' +
+  'last_stream_ended_at,created_at,updated_at,' +
+  'onboarding_responses(completed_at)';
+
 export class UsersService {
 
+  /**
+   * The current user, plus a computed `onboarding_completed` flag.
+   *
+   * That flag is computed rather than stored because there is no such
+   * column — and the frontend's AuthGuard was already testing
+   * `user.onboarding_completed === false` to decide whether to redirect to
+   * /onboarding. Reading a column that does not exist yields undefined, and
+   * `undefined === false` is false, so that redirect never fired and users
+   * who skipped onboarding were silently let through to the dashboard.
+   *
+   * The definition matches getOnboardingStatus below — a name on the
+   * profile and a completed survey — so the two cannot disagree.
+   */
   async getProfile(userId: string) {
     const { data, error } = await supabaseAdmin
-      .from('users').select('*').eq('id', userId).single();
+      .from('users').select(PROFILE_COLUMNS).eq('id', userId).single();
     if (error || !data) throw new NotFoundError('User');
-    return data;
+
+    // Cast through unknown: with an embedded relation in the select string,
+    // supabase-js widens the row type to a union that includes its parse-error
+    // marker, which does not overlap a plain record.
+    const row = data as unknown as Record<string, unknown>;
+
+    // An embedded to-one relation normally arrives as an object, but PostgREST
+    // sends an array when it cannot prove the relation is unique. Handle both
+    // rather than depending on which inference it makes.
+    const raw    = row.onboarding_responses;
+    const survey = (Array.isArray(raw) ? raw[0] : raw) as { completed_at?: string } | null;
+
+    const { onboarding_responses: _omit, ...user } = row;
+
+    return {
+      ...user,
+      onboarding_completed: !!(user.full_name && survey?.completed_at),
+    };
   }
 
   /**

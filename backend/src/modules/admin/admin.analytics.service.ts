@@ -1,167 +1,111 @@
 import { supabaseAdmin } from '../../config/supabase';
+import { logger } from '../../config/logger';
+
+/** Kobo → "₦1,234". Paystack amounts are minor units throughout. */
+const naira = (kobo: number): string =>
+  `₦${(kobo / 100).toLocaleString('en-NG')}`;
+
+interface DashboardStats {
+  users: {
+    total: number; active: number; premium: number; flagged: number;
+    suspended: number; banned: number; newThisWeek: number; newThisMonth: number;
+  };
+  streams: { total: number; live: number };
+  revenue: { total: number; thisMonth: number; pending: number; failed: number };
+  subscriptions: { total: number; active: number; cancelledThisMonth: number };
+  payments: { pending: number; failed: number };
+}
 
 export class AdminAnalyticsService {
 
   // ── Dashboard KPIs ───────────────────────────────────────────────
+  /**
+   * The whole KPI header in a single round trip.
+   *
+   * This was 17 concurrent queries: 13 `count: 'exact', head: true` calls —
+   * each of which is a full scan, since Postgres cannot answer a filtered
+   * count from an index alone — plus 4 that selected every matching invoice
+   * and summed `amount` in JavaScript. Concurrency hid the cost at small
+   * scale but not the growth: the four sums transferred every invoice ever
+   * issued, so the dashboard got slower with each month of trading.
+   *
+   * admin_dashboard_stats() scans each table once for all of its metrics
+   * using `count(*) filter (...)` and returns a single JSON row.
+   */
   async getDashboardStats() {
-    const now = new Date();
-    const startOfWeek  = new Date(now); startOfWeek.setDate(now.getDate() - 7);
-    const startOfMonth = new Date(now); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
-    const startOfYear  = new Date(now.getFullYear(), 0, 1);
+    const { data, error } = await supabaseAdmin.rpc('admin_dashboard_stats');
 
-    const [
-      { count: totalUsers },
-      { count: activeUsers },
-      { count: premiumUsers },
-      { count: flaggedUsers },
-      { count: suspendedUsers },
-      { count: bannedUsers },
-      { count: totalStreams },
-      { count: liveStreams },
-      { count: newUsersThisWeek },
-      { count: newUsersThisMonth },
-      { data: revenueData },
-      { data: revenueThisMonth },
-      { data: pendingPayments },
-      { data: failedPayments },
-      { count: totalSubscriptions },
-      { count: activeSubscriptions },
-      { count: cancelledThisMonth },
-    ] = await Promise.all([
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }).eq('plan', 'premium'),
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }).eq('status', 'flagged'),
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }).eq('status', 'suspended'),
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }).eq('status', 'banned'),
-      supabaseAdmin.from('streams').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('streams').select('*', { count: 'exact', head: true }).eq('status', 'live'),
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }).gte('created_at', startOfWeek.toISOString()),
-      supabaseAdmin.from('users').select('*', { count: 'exact', head: true }).gte('created_at', startOfMonth.toISOString()),
-      supabaseAdmin.from('invoices').select('amount').eq('status', 'paid'),
-      supabaseAdmin.from('invoices').select('amount').eq('status', 'paid').gte('created_at', startOfMonth.toISOString()),
-      supabaseAdmin.from('invoices').select('amount, created_at').eq('status', 'pending'),
-      supabaseAdmin.from('invoices').select('amount, created_at').eq('status', 'failed'),
-      supabaseAdmin.from('subscriptions').select('*', { count: 'exact', head: true }),
-      supabaseAdmin.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-      supabaseAdmin.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'cancelled').gte('updated_at', startOfMonth.toISOString()),
-    ]);
+    if (error || !data) {
+      // Surfaced rather than swallowed: an empty dashboard reads as "no
+      // users, no revenue", which is indistinguishable from a real zero.
+      logger.error({ err: error }, 'admin_dashboard_stats RPC failed — run migrate_v9_performance.sql');
+      throw error ?? new Error('Dashboard stats unavailable');
+    }
 
-    const totalRevenue      = (revenueData      ?? []).reduce((s, r) => s + r.amount, 0);
-    const revenueThisMonthN = (revenueThisMonth ?? []).reduce((s, r) => s + r.amount, 0);
-    const pendingRevenue    = (pendingPayments   ?? []).reduce((s, r) => s + r.amount, 0);
-    const failedRevenue     = (failedPayments    ?? []).reduce((s, r) => s + r.amount, 0);
+    const s = data as DashboardStats;
 
     return {
-      users: {
-        total: totalUsers ?? 0,
-        active: activeUsers ?? 0,
-        premium: premiumUsers ?? 0,
-        flagged: flaggedUsers ?? 0,
-        suspended: suspendedUsers ?? 0,
-        banned: bannedUsers ?? 0,
-        newThisWeek: newUsersThisWeek ?? 0,
-        newThisMonth: newUsersThisMonth ?? 0,
-      },
-      streams: {
-        total: totalStreams ?? 0,
-        live: liveStreams ?? 0,
-      },
+      ...s,
       revenue: {
-        total: totalRevenue,
-        thisMonth: revenueThisMonthN,
-        pending: pendingRevenue,
-        failed: failedRevenue,
-        totalFormatted: `₦${(totalRevenue / 100).toLocaleString('en-NG')}`,
-        thisMonthFormatted: `₦${(revenueThisMonthN / 100).toLocaleString('en-NG')}`,
-      },
-      subscriptions: {
-        total: totalSubscriptions ?? 0,
-        active: activeSubscriptions ?? 0,
-        cancelledThisMonth: cancelledThisMonth ?? 0,
-      },
-      payments: {
-        pending: pendingPayments?.length ?? 0,
-        failed: failedPayments?.length ?? 0,
+        ...s.revenue,
+        totalFormatted:     naira(s.revenue.total),
+        thisMonthFormatted: naira(s.revenue.thisMonth),
       },
     };
   }
 
   // ── Revenue chart (daily for a date range) ───────────────────────
+  /**
+   * Bucketing moved into date_trunc. The JS version pulled every paid
+   * invoice in the range to build what is at most a few hundred points.
+   */
   async getRevenueChart(from: string, to: string, groupBy: 'day' | 'week' | 'month' = 'day') {
-    const { data, error } = await supabaseAdmin
-      .from('invoices')
-      .select('amount, created_at, status, currency')
-      .eq('status', 'paid')
-      .gte('created_at', from)
-      .lte('created_at', to)
-      .order('created_at', { ascending: true });
+    const { data, error } = await supabaseAdmin.rpc('admin_revenue_chart', {
+      p_from: from, p_to: to, p_group_by: groupBy,
+    });
 
     if (error) throw error;
 
-    // Group by period
-    const groups: Record<string, number> = {};
-    for (const inv of data ?? []) {
-      const d = new Date(inv.created_at);
-      let key: string;
-      if (groupBy === 'month') {
-        key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      } else if (groupBy === 'week') {
-        const weekStart = new Date(d);
-        weekStart.setDate(d.getDate() - d.getDay());
-        key = weekStart.toISOString().slice(0, 10);
-      } else {
-        key = d.toISOString().slice(0, 10);
-      }
-      groups[key] = (groups[key] ?? 0) + inv.amount;
-    }
-
-    return Object.entries(groups).map(([date, amount]) => ({
-      date,
-      amount,
-      formatted: `₦${(amount / 100).toLocaleString('en-NG')}`,
+    return (data as { bucket: string; amount: number }[] ?? []).map(r => ({
+      date:      r.bucket,
+      amount:    Number(r.amount),
+      formatted: naira(Number(r.amount)),
     }));
   }
 
   // ── User growth chart ────────────────────────────────────────────
   async getUserGrowthChart(from: string, to: string) {
-    const { data, error } = await supabaseAdmin
-      .from('users')
-      .select('created_at, plan')
-      .gte('created_at', from)
-      .lte('created_at', to)
-      .order('created_at', { ascending: true });
+    const { data, error } = await supabaseAdmin.rpc('admin_user_growth', {
+      p_from: from, p_to: to,
+    });
 
     if (error) throw error;
 
-    const groups: Record<string, { total: number; free: number; premium: number }> = {};
-    for (const u of data ?? []) {
-      const key = new Date(u.created_at).toISOString().slice(0, 10);
-      if (!groups[key]) groups[key] = { total: 0, free: 0, premium: 0 };
-      groups[key].total++;
-      u.plan === 'premium' ? groups[key].premium++ : groups[key].free++;
-    }
-
-    return Object.entries(groups).map(([date, counts]) => ({ date, ...counts }));
+    return (data as { bucket: string; total: number; free: number; premium: number }[] ?? [])
+      .map(r => ({
+        date:    r.bucket,
+        // bigint arrives as a string over PostgREST for values past 2^53;
+        // Number() keeps the response shape numeric either way.
+        total:   Number(r.total),
+        free:    Number(r.free),
+        premium: Number(r.premium),
+      }));
   }
 
   // ── Subscription breakdown ───────────────────────────────────────
+  /** Five filtered counts over the same table — one scan, not five. */
   async getSubscriptionBreakdown() {
-    const [
-      { count: monthly },
-      { count: annual },
-      { count: active },
-      { count: cancelled },
-      { count: pastDue },
-    ] = await Promise.all([
-      supabaseAdmin.from('subscriptions').select('*', { count: 'exact', head: true }).eq('billing_cycle', 'monthly').eq('status', 'active'),
-      supabaseAdmin.from('subscriptions').select('*', { count: 'exact', head: true }).eq('billing_cycle', 'annual').eq('status', 'active'),
-      supabaseAdmin.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-      supabaseAdmin.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'cancelled'),
-      supabaseAdmin.from('subscriptions').select('*', { count: 'exact', head: true }).eq('status', 'past_due'),
-    ]);
+    const { data, error } = await supabaseAdmin.rpc('admin_subscription_breakdown');
+    if (error) throw error;
 
-    return { monthly: monthly ?? 0, annual: annual ?? 0, active: active ?? 0, cancelled: cancelled ?? 0, pastDue: pastDue ?? 0 };
+    const d = (data ?? {}) as Record<string, number>;
+    return {
+      monthly:   Number(d.monthly   ?? 0),
+      annual:    Number(d.annual    ?? 0),
+      active:    Number(d.active    ?? 0),
+      cancelled: Number(d.cancelled ?? 0),
+      pastDue:   Number(d.pastDue   ?? 0),
+    };
   }
 
   // ── All payments with filters ────────────────────────────────────
@@ -209,16 +153,21 @@ export class AdminAnalyticsService {
   }
 
   // ── Platform usage stats ─────────────────────────────────────────
+  /**
+   * Counted in Postgres. The JS tally read every connection row — up to
+   * eight per user — to produce two integers per platform.
+   *
+   * Still keyed by platform name in the response so the frontend contract
+   * is unchanged.
+   */
   async getPlatformStats() {
-    const { data } = await supabaseAdmin
-      .from('platform_connections')
-      .select('platform, status');
+    const { data, error } = await supabaseAdmin.rpc('admin_platform_stats');
+    if (error) throw error;
 
+    const rows = (data as { platform: string; total: number; connected: number }[]) ?? [];
     const stats: Record<string, { total: number; connected: number }> = {};
-    for (const conn of data ?? []) {
-      if (!stats[conn.platform]) stats[conn.platform] = { total: 0, connected: 0 };
-      stats[conn.platform].total++;
-      if (conn.status === 'connected') stats[conn.platform].connected++;
+    for (const r of rows) {
+      stats[r.platform] = { total: Number(r.total), connected: Number(r.connected) };
     }
     return stats;
   }

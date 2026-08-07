@@ -47,7 +47,7 @@ export class WaitlistService {
     // Send waitlist confirmation email with full offer details
     await emailSvc.sendWaitlistConfirmationEmail(email);
 
-    return { message: "You're on the list! Check your email for your exclusive offer. 🎉", alreadyOnList: false };
+    return { message: "You're on the list. Check your email for your exclusive offer.", alreadyOnList: false };
   }
 
   /**

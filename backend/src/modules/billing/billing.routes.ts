@@ -45,9 +45,13 @@ export async function billingRoutes(fastify: FastifyInstance): Promise<void> {
 
     // Plans
     r.get('/plans', { schema: { tags: ['Billing'], summary: 'Subscription plans + pricing', security: [{ bearerAuth: [] }] } },
-      async (_req, reply) => sendSuccess(reply, Object.entries(PLANS).map(([id, p]) => ({
-        id, ...p, amountFormatted: `₦${(p.amount / 100).toLocaleString('en-NG')}`,
-      }))));
+      async (_req, reply) => {
+        // Static pricing table — no DB access, same bytes for everyone.
+        reply.header('Cache-Control', 'private, max-age=3600');
+        return sendSuccess(reply, Object.entries(PLANS).map(([id, p]) => ({
+          id, ...p, amountFormatted: `₦${(p.amount / 100).toLocaleString('en-NG')}`,
+        })));
+      });
 
     // Subscribe — card or Google Pay
     r.post('/subscribe', {
@@ -288,7 +292,7 @@ export async function billingRoutes(fastify: FastifyInstance): Promise<void> {
         plan:      'premium',
         periodEnd: periodEnd.toISOString(),
         daysGranted: 30,
-        message:   'Premium activated! Enjoy 1 month on us 🎉',
+        message:   'Premium activated — your first month is on us.',
       }, 'Premium activated successfully');
     });
 

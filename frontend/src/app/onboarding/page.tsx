@@ -12,7 +12,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { api, getApiError, TOKEN_KEYS } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 
-// ⚠ Values MUST match backend enum exactly
+// Values MUST match the backend enum exactly
 const HEARD_FROM: { value: string; label: string }[] = [
   { value: 'social_media',     label: 'Social Media'       },
   { value: 'friend_referral',  label: 'A Friend'           },

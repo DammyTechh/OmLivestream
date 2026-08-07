@@ -125,7 +125,7 @@ export default function WaitlistPage() {
           )}
 
           <p className="text-center text-sm text-muted mt-12">
-            Over <span className="text-primary font-semibold">1,200+ creators</span> already on the list. 🎉
+            Over <span className="text-primary font-semibold">1,200+ creators</span> already on the list.
           </p>
         </div>
       </main>

@@ -30,9 +30,9 @@ No authentication required. Call from the landing page form.
 On success:
 - User is added to the waitlist
 - Confirmation email sent with the full offer:
-  🎁 1 Month FREE trial extension
-  💸 50% off first 6 months
-  🔥 Full premium access during trial
+  - One month free trial extension
+  - 50% off the first 6 months
+  - Full premium access during the trial
 
 When they register, the reward is automatically applied.
       `.trim(),

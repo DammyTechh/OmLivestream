@@ -132,7 +132,7 @@ function clean(raw: NodeJS.ProcessEnv): Record<string, string | undefined> {
 const parsed = envSchema.safeParse(clean(process.env));
 
 if (!parsed.success) {
-  console.error('\n❌  OmliveStream — Invalid environment variables:\n');
+  console.error('\nOmliveStream — invalid environment variables:\n');
   Object.entries(parsed.error.flatten().fieldErrors).forEach(([key, msgs]) => {
     console.error(`   ${key}: ${msgs?.join(', ')}`);
   });

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { StreamsService } from './streams.service';
+import { getBroadcastStatus } from '../webrtc/broadcast.service';
 import { authenticate } from '../../middleware/auth';
 import { getAuthUser } from '../../utils/jwt';
 import { sendSuccess, sendCreated, paginateMeta } from '../../utils/response';
@@ -31,8 +32,47 @@ const networkAnalysisSchema = z.object({
   selectedPlatforms: z.array(z.enum(PLATFORMS)).default([]),
 });
 
+const replySchema = z.object({
+  platform:  z.enum(PLATFORMS),
+  commentId: z.string().min(1),
+  text:      z.string().min(1).max(1000),
+});
+
 export async function streamsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.addHook('preHandler', authenticate);
+
+  /**
+   * Binary body parser for the upload speed test.
+   *
+   * The measurement lives here rather than in the handler because this is
+   * the only place with a reference to the body stream before anything
+   * else touches it. Handing the stream through untouched and reading it
+   * in the handler races with Fastify's own lifecycle.
+   *
+   * Nothing is buffered — we count bytes as they arrive and discard them,
+   * so a 16 MB test costs no memory.
+   */
+  fastify.addContentTypeParser(
+    'application/octet-stream',
+    (_req, payload, done) => {
+      const started = process.hrtime.bigint();
+      let firstByteAt: bigint | null = null;
+      let bytes = 0;
+
+      payload.on('data', (chunk: Buffer) => {
+        if (firstByteAt === null) firstByteAt = process.hrtime.bigint();
+        bytes += chunk.length;
+      });
+      payload.on('end', () => {
+        const finished = process.hrtime.bigint();
+        // Measure from the first byte, not from request start: the gap
+        // before it is handshake and header time, not throughput.
+        const transferNs = Number(finished - (firstByteAt ?? started));
+        done(null, { bytes, transferNs });
+      });
+      payload.on('error', (err: Error) => done(err, undefined));
+    }
+  );
 
   // List streams
   fastify.get('/', {
@@ -149,14 +189,122 @@ export async function streamsRoutes(fastify: FastifyInstance): Promise<void> {
     reply.send({ pong: true, serverTime: new Date().toISOString() });
   });
 
-  // Upload speed test
+  /**
+   * Upload speed test.
+   *
+   * The client POSTs a binary blob and we report how long the body
+   * actually took to arrive, measured server-side from first byte to last.
+   * Client-side timing around fetch() includes DNS, TLS and TCP handshake,
+   * which on a fresh connection is easily 200ms and would make a 1 MB
+   * upload look several times slower than it is.
+   *
+   * bytesReceived is counted, not read from Content-Length, because that
+   * header is client-declared and trivially wrong.
+   *
+   * Client should send Content-Type: application/octet-stream so Fastify
+   * does not attempt to parse the body as JSON.
+   */
   fastify.post('/network-upload-test', {
+    // 24 MB ceiling: enough for a 4 s test on a 40 Mbps uplink, small
+    // enough that it cannot be used to tie up the box.
+    bodyLimit: 24 * 1024 * 1024,
     schema: {
       tags: ['Streams'],
-      summary: 'Upload speed test — POST a blob, measure elapsed time',
+      summary: 'Upload speed test — POST a binary blob, get server-measured receive time',
       security: [{ bearerAuth: [] }],
     },
   }, async (req: FastifyRequest, reply: FastifyReply) => {
-    reply.send({ received: true, bytes: req.headers['content-length'] ?? 0, serverTime: new Date().toISOString() });
+    const { bytes, transferNs } = req.body as { bytes: number; transferNs: number };
+    const seconds = transferNs / 1e9;
+
+    reply.send({
+      received:      true,
+      bytesReceived: bytes,
+      transferMs:    Math.round(transferNs / 1e6),
+      // Only meaningful for a large enough payload over a long enough
+      // window; the client discards samples below its own thresholds.
+      mbps:          seconds > 0 ? +((bytes * 8) / seconds / 1e6).toFixed(3) : 0,
+      serverTime:    new Date().toISOString(),
+    });
+  });
+
+  /**
+   * Begin pushing to platforms.
+   *
+   * Separate from /start because mediasoup has nothing to forward until
+   * the browser has produced its tracks. Call this after produce().
+   */
+  fastify.post('/:id/broadcast', {
+    schema: {
+      tags: ['Streams'],
+      summary: 'Begin RTMP push to all connected platforms',
+      description:
+        'Call after the browser has created its send transport and produced ' +
+        'video (and optionally audio). Starts the RTP→RTMP bridge.',
+      security: [{ bearerAuth: [] }],
+    },
+  }, async (req: FastifyRequest<{ Params: { id: string } }>, reply) => {
+    const u = getAuthUser(req);
+    const result = await svc.beginBroadcast(u.id, req.params.id);
+    sendSuccess(reply, result, `Broadcasting to ${result.platforms} platform(s)`);
+  });
+
+  /** Live bridge status — is ffmpeg up, how many restarts. */
+  fastify.get('/:id/broadcast', {
+    schema: {
+      tags: ['Streams'],
+      summary: 'Get RTMP bridge status for a stream',
+      security: [{ bearerAuth: [] }],
+    },
+  }, async (req: FastifyRequest<{ Params: { id: string } }>, reply) => {
+    sendSuccess(reply, getBroadcastStatus(req.params.id));
+  });
+
+  /**
+   * Reply to a live comment, posted back to the source platform.
+   *
+   * This route did not exist — the frontend was POSTing here and getting
+   * a 404 on every reply attempt.
+   */
+  fastify.post('/:id/comments/reply', {
+    schema: {
+      tags: ['Streams'],
+      summary: 'Reply to a live comment on its source platform',
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['platform', 'commentId', 'text'],
+        properties: {
+          platform:  { type: 'string', enum: PLATFORMS },
+          commentId: { type: 'string', minLength: 1 },
+          text:      { type: 'string', minLength: 1, maxLength: 1000 },
+        },
+      },
+    },
+  }, async (req: FastifyRequest<{ Params: { id: string } }>, reply) => {
+    const body = replySchema.parse(req.body);
+    const u    = getAuthUser(req);
+    const result = await svc.replyToComment(u.id, req.params.id, body);
+    sendSuccess(reply, result, 'Reply sent');
+  });
+
+  /**
+   * Comment backfill. The socket only delivers comments that arrive while
+   * it is connected, so a client that joins late or reconnects mid-stream
+   * needs this to fill the gap.
+   */
+  fastify.get('/:id/comments', {
+    schema: {
+      tags: ['Streams'],
+      summary: 'Recent live comments for a stream',
+      security: [{ bearerAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: { limit: { type: 'integer', minimum: 1, maximum: 300, default: 100 } },
+      },
+    },
+  }, async (req: FastifyRequest<{ Params: { id: string }; Querystring: { limit?: number } }>, reply) => {
+    const u = getAuthUser(req);
+    sendSuccess(reply, await svc.listComments(u.id, req.params.id, req.query.limit ?? 100));
   });
 }

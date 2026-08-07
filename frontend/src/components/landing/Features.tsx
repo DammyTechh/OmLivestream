@@ -54,8 +54,8 @@ function PlatformsVisual() {
 // ── Visual 2: Live comments feed ──
 function ChatVisual() {
   const msgs = [
-    { user: '@alex_live',   text: 'Insane quality 🔥',         Icon: InstagramIcon, platform: 'Instagram' },
-    { user: '@jayVOD',      text: 'Subbed and sharing 👀',    Icon: FacebookIcon,  platform: 'Facebook'  },
+    { user: '@alex_live',   text: 'Insane quality',           Icon: InstagramIcon, platform: 'Instagram' },
+    { user: '@jayVOD',      text: 'Subbed and sharing',       Icon: FacebookIcon,  platform: 'Facebook'  },
     { user: '@nora_w',      text: 'What mic is that??',        Icon: YouTubeIcon,   platform: 'YouTube'   },
     { user: '@creator_kai', text: 'this is next level setup',  Icon: TikTokIcon,    platform: 'TikTok'    },
   ];

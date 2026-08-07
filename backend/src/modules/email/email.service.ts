@@ -65,7 +65,7 @@ export class EmailService {
       <div style="background:#14102A;border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:24px;text-align:center;margin:0 0 28px;">
         <span style="font-family:'Courier New',monospace;font-size:44px;font-weight:700;letter-spacing:14px;color:#A855F7;">${otp}</span>
       </div>
-      <p style="color:${muted};font-size:13px;line-height:1.6;margin:0;"> Expires in <strong style="color:${text};">10 minutes</strong> &nbsp;•&nbsp; Never share this code.</p>
+      <p style="color:${muted};font-size:13px;line-height:1.6;margin:0;">Expires in <strong style="color:${text};">10 minutes</strong> &nbsp;•&nbsp; Never share this code.</p>
     </td></tr>`);
     await this.send(to, subject, html);
   }
@@ -73,16 +73,16 @@ export class EmailService {
   // ── 2. Welcome ─────────────────────────────────────────────────
   async sendWelcomeEmail(to: string): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;"> Your account is ready!</h2>
+      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Your account is ready</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 20px;">Welcome to OmliveStream — the only platform you need to go live everywhere at once.</p>
       <ol style="color:${muted};font-size:14px;line-height:2;margin:0 0 28px;padding-left:18px;">
         <li><strong style="color:${text};">Connect your platforms</strong> — YouTube, TikTok, Twitch & more</li>
         <li><strong style="color:${text};">Create a stream</strong> — title, thumbnail, select platforms</li>
-        <li><strong style="color:${text};">Go Live!</strong> — reach your entire audience simultaneously</li>
+        <li><strong style="color:${text};">Go live</strong> — reach your entire audience simultaneously</li>
       </ol>
       ${btn(`${urls.dashboard}/dashboard`, 'Go to Dashboard →')}
     </td></tr>`);
-    await this.send(to, '🎉 Welcome to OmliveStream — your account is ready!', html);
+    await this.send(to, 'Welcome to OmliveStream — your account is ready', html);
   }
 
   // ── 3. Payment receipt ─────────────────────────────────────────
@@ -90,8 +90,8 @@ export class EmailService {
     const amount = new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(d.amount / 100);
     const html = wrap(`<tr><td style="padding:36px 40px;">
       <div style="text-align:center;margin-bottom:28px;">
-        <div style="width:56px;height:56px;background:#10B981;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:12px;">✓</div>
-        <h2 style="color:${text};font-size:22px;font-weight:700;margin:0;">Payment Successful</h2>
+        <span style="display:inline-block;background:rgba(16,185,129,0.15);color:#10B981;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:5px 12px;border-radius:99px;margin-bottom:14px;">Payment received</span>
+        <h2 style="color:${text};font-size:22px;font-weight:700;margin:0;">Payment successful</h2>
       </div>
       <table width="100%" style="background:#14102A;border-radius:12px;padding:20px;margin-bottom:24px;">
         ${row('Plan', `${d.plan} (${d.billingCycle})`)}
@@ -119,7 +119,7 @@ export class EmailService {
   // ── 5. Recording ready ─────────────────────────────────────────
   async sendRecordingReadyEmail(to: string, streamTitle: string): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">🎬 Your recording is ready!</h2>
+      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Your recording is ready</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 8px;">Your stream <strong style="color:${text};">"${streamTitle}"</strong> has been saved successfully.</p>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 28px;">Download, AI-edit, or publish directly to your platforms.</p>
       ${btn(`${urls.dashboard}/recordings`, 'View Recording →')}
@@ -130,38 +130,37 @@ export class EmailService {
   // ── 6. Birthday ────────────────────────────────────────────────
   async sendBirthdayEmail(to: string, name: string): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;text-align:center;">
-      <div style="font-size:56px;margin-bottom:12px;">🎂</div>
-      <h2 style="color:${text};font-size:24px;font-weight:800;margin:0 0 12px;">Happy Birthday, ${name || 'Creator'}!</h2>
-      <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 28px;">Wishing you an amazing day from the whole OmliveStream team. Go celebrate — and maybe stream it!</p>
+      <h2 style="color:${text};font-size:24px;font-weight:800;margin:0 0 12px;">Happy birthday, ${name || 'Creator'}</h2>
+      <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 28px;">Wishing you a great day from everyone at OmliveStream. If you are celebrating on camera, we would love to see it.</p>
       ${btn(`${urls.dashboard}/dashboard`, 'Start a Birthday Stream')}
     </td></tr>`);
-    await this.send(to, '🎂 Happy Birthday from OmliveStream!', html);
+    await this.send(to, 'Happy birthday from OmliveStream', html);
   }
 
   // ── 7. Re-engagement ───────────────────────────────────────────
   async sendReEngagementEmail(to: string, name: string): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">👀 Your audience misses you, ${name || 'Creator'}!</h2>
+      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Your audience is waiting, ${name || 'Creator'}</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 12px;">You haven't streamed in 5 days. Your followers across all your connected platforms are waiting.</p>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 28px;">Consistency is what builds an audience. Even a short stream keeps the momentum going.</p>
       ${btn(`${urls.dashboard}/dashboard`, 'Go Live Now →')}
     </td></tr>`);
-    await this.send(to, `👀 ${name || 'Creator'}, your audience misses you!`, html);
+    await this.send(to, `${name || 'Creator'}, your audience is waiting`, html);
   }
 
   // ── 8. Feedback confirmation ───────────────────────────────────
   async sendFeedbackConfirmation(to: string): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">💜 Thanks for your feedback!</h2>
+      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Thank you for your feedback</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0;">We read every message. Your input shapes how OmliveStream grows.</p>
     </td></tr>`);
-    await this.send(to, 'OmliveStream — We received your feedback 💜', html);
+    await this.send(to, 'OmliveStream — we received your feedback', html);
   }
 
   // ── 9. Subscription renewal ────────────────────────────────────
   async sendRenewalEmail(to: string, nextBillingDate: string, plan: string): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">🔄 Subscription Renewed</h2>
+      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Subscription renewed</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 8px;">Your <strong style="color:${text};">${plan}</strong> plan has been renewed successfully.</p>
       <p style="color:${muted};font-size:14px;margin:0 0 28px;">Next billing date: <strong style="color:${text};">${new Date(nextBillingDate).toLocaleDateString('en-NG', { dateStyle: 'long' })}</strong></p>
       ${btn(`${urls.payment}/billing`, 'View Billing →')}
@@ -177,14 +176,14 @@ export class EmailService {
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 28px;">${description}</p>
       ${btn(`${urls.dashboard}/dashboard`, 'Try It Now →')}
     </td></tr>`);
-    await this.send(to, `✨ New on OmliveStream: ${title}`, html);
+    await this.send(to, `New on OmliveStream: ${title}`, html);
   }
 
   // ── 11. New device login alert ─────────────────────────────────
   async sendNewDeviceLoginEmail(to: string, d: { ip: string; userAgent: string; time: string }): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <div style="text-align:center;margin-bottom:24px;">
-        <div style="width:56px;height:56px;background:#EF4444;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:28px;">🔐</div>
+      <div style="margin-bottom:20px;">
+        <span style="display:inline-block;background:rgba(239,68,68,0.15);color:#EF4444;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:5px 12px;border-radius:99px;">Security alert</span>
       </div>
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">New device sign-in detected</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 20px;">Someone signed into your OmliveStream account from an unrecognised device.</p>
@@ -203,8 +202,7 @@ export class EmailService {
   async sendAdminGrantedPremiumEmail(to: string, name: string, billingCycle: string, periodEnd: string): Promise<void> {
     const endDate = new Date(periodEnd).toLocaleDateString('en-NG', { dateStyle: 'long' });
     const html = wrap(`<tr><td style="padding:36px 40px;text-align:center;">
-      <div style="font-size:56px;margin-bottom:12px;">🌟</div>
-      <h2 style="color:${text};font-size:24px;font-weight:800;margin:0 0 12px;">You're now Premium, ${name || 'Creator'}!</h2>
+      <h2 style="color:${text};font-size:24px;font-weight:800;margin:0 0 12px;">You're now on Premium, ${name || 'Creator'}</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 16px;">Your OmliveStream Premium subscription has been activated by our team.</p>
       <table width="100%" style="background:#14102A;border-radius:12px;padding:20px;margin-bottom:24px;text-align:left;">
         ${row('Plan', 'Premium')}
@@ -214,31 +212,30 @@ export class EmailService {
       <p style="color:${muted};font-size:14px;margin:0 0 28px;">Full access — comment replies, AI editing, 8 platforms, analytics.</p>
       ${btn(`${urls.dashboard}/dashboard`, 'Start Streaming →')}
     </td></tr>`);
-    await this.send(to, '🌟 Your OmliveStream Premium is active!', html);
+    await this.send(to, 'Your OmliveStream Premium plan is active', html);
   }
 
   // ── 13. Waitlist confirmation ──────────────────────────────────
   async sendWaitlistConfirmationEmail(to: string): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;text-align:center;">
-      <div style="font-size:48px;margin-bottom:12px;">🚀</div>
-      <h2 style="color:${text};font-size:24px;font-weight:800;margin:0 0 16px;">You're on the list!</h2>
+      <h2 style="color:${text};font-size:24px;font-weight:800;margin:0 0 16px;">You're on the list</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 28px;">Welcome to the OmliveStream waitlist. Here's what you get when we launch:</p>
       <table width="100%" style="background:#14102A;border-radius:12px;padding:24px;margin-bottom:28px;text-align:left;">
         <tr><td style="padding:12px 0;border-bottom:1px solid rgba(124,58,237,0.15);">
-          <p style="margin:0;color:${text};font-size:15px;font-weight:700;">🎁 1 Month FREE</p>
+          <p style="margin:0;color:${text};font-size:15px;font-weight:700;">One month free</p>
           <p style="margin:4px 0 0;color:${muted};font-size:13px;">Full Premium access, completely free for your first month</p>
         </td></tr>
         <tr><td style="padding:12px 0;border-bottom:1px solid rgba(124,58,237,0.15);">
-          <p style="margin:0;color:${text};font-size:15px;font-weight:700;">💸 50% Off First 6 Months</p>
+          <p style="margin:0;color:${text};font-size:15px;font-weight:700;">50% off your first 6 months</p>
           <p style="margin:4px 0 0;color:${muted};font-size:13px;">Half price on your first 6 months of Premium</p>
         </td></tr>
         <tr><td style="padding:12px 0;">
-          <p style="margin:0;color:${text};font-size:15px;font-weight:700;">🔥 Full Premium Access</p>
+          <p style="margin:0;color:${text};font-size:15px;font-weight:700;">Full Premium access</p>
           <p style="margin:4px 0 0;color:${muted};font-size:13px;">Stream to 8 platforms, comment replies, AI editing & more</p>
         </td></tr>
       </table>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 8px;">Discount codes will be automatically applied when you register.</p>
-      <p style="color:#A855F7;font-size:13px;font-weight:600;">Over 1,200 creators are already waiting. 🎉</p>
+      <p style="color:#A855F7;font-size:13px;font-weight:600;">Over 1,200 creators are already on the list.</p>
     </td></tr>`);
     await this.send(to, "You're on the OmliveStream waitlist — your exclusive offer inside", html);
   }
@@ -246,7 +243,7 @@ export class EmailService {
   // ── 14. Waitlist reward codes (after registration) ─────────────
   async sendWaitlistRewardEmail(to: string, d: { freeMonthCode: string; sixMonthCode: string; trialDays: number }): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <h2 style="color:${text};font-size:22px;font-weight:800;margin:0 0 8px;">🎁 Your waitlist rewards are here!</h2>
+      <h2 style="color:${text};font-size:22px;font-weight:800;margin:0 0 8px;">Your waitlist rewards</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 24px;">As a waitlist member you get ${d.trialDays} days of free trial plus these exclusive codes:</p>
       <div style="background:#14102A;border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:20px;margin-bottom:16px;">
         <p style="color:#A855F7;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin:0 0 8px;">First Month Free</p>
@@ -261,13 +258,13 @@ export class EmailService {
       ${btn(`${urls.dashboard}/dashboard`, 'Start Streaming →')}
       <p style="color:${muted};font-size:12px;margin:16px 0 0;">Codes expire in 90 days. Apply via Settings → Billing → Apply Code.</p>
     </td></tr>`);
-    await this.send(to, '🎁 Your OmliveStream waitlist rewards — codes inside', html);
+    await this.send(to, 'Your OmliveStream waitlist rewards — codes inside', html);
   }
 
   // ── 15. Trial ending soon ──────────────────────────────────────
   async sendTrialEndingSoonEmail(to: string, name: string, daysLeft: number): Promise<void> {
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">⏳ Your free trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}</h2>
+      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Your free trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 20px;">Hey ${name || 'Creator'}, your OmliveStream trial is ending soon. After it ends, you'll move to the Free plan (1 platform only).</p>
       <table width="100%" style="background:#14102A;border-radius:12px;padding:20px;margin-bottom:24px;">
         ${row('Current (Trial)', '2 platforms, view comments, 3 streams/day')}
@@ -277,7 +274,7 @@ export class EmailService {
       <p style="color:${muted};font-size:14px;margin:0 0 24px;">Upgrade now to keep streaming to multiple platforms without interruption.</p>
       ${btn(`${urls.payment}/billing`, 'Upgrade to Premium →')}
     </td></tr>`);
-    await this.send(to, `⏳ Your OmliveStream trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''} — don't lose access`, html);
+    await this.send(to, `Your OmliveStream trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`, html);
   }
 
   // ── 16. Trial expired ──────────────────────────────────────────

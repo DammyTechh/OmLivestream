@@ -58,8 +58,8 @@ export function WaitlistOfferPopup() {
 
   const labelFor = (c: DiscountCode) =>
     c.discount_type === 'first_month_free'
-      ? '🎁 1 Month FREE'
-      : `💸 ${c.discount_pct}% off first 6 months`;
+      ? 'One month free'
+      : `${c.discount_pct}% off your first 6 months`;
 
   return (
     <AnimatePresence>

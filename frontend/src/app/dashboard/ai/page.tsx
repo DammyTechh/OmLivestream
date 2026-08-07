@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Bot, Send, Sparkles, Wand2, AlertCircle } from 'lucide-react';
+import { Bot, Send, Sparkles, Wand2, AlertCircle, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -32,7 +32,7 @@ export default function AIStudioPage() {
     } catch (err) {
       const msg = getApiError(err, 'AI is unavailable right now');
       if (msg.includes('AI is temporarily unavailable')) setQuotaExhausted(true);
-      setMessages((prev) => [...prev, { role: 'assistant', content: `⚠️  ${msg}` }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: msg }]);
     } finally { setLoading(false); }
   };
 
@@ -91,7 +91,9 @@ export default function AIStudioPage() {
                 <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
                   m.role === 'user' ? 'bg-primary/20' : 'bg-gradient-to-br from-primary to-accent'
                 }`}>
-                  {m.role === 'user' ? '👤' : <Sparkles size={14} className="text-white" />}
+                  {m.role === 'user'
+                    ? <User size={14} className="text-primary" />
+                    : <Sparkles size={14} className="text-white" />}
                 </div>
                 <div className={`max-w-md px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap ${
                   m.role === 'user' ? 'bg-primary/20 text-text' : 'bg-white/5 text-text'

@@ -5,6 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card } from '@/components/ui/Card';
 import { api } from '@/lib/api';
 import { formatNumber } from '@/lib/utils';
+import { palette, chartAxis, chartTooltip } from '@/lib/theme';
 
 interface Overview { total_views?: number; total_impressions?: number; total_engagement?: number; }
 interface PlatformBreakdown { platform: string; views: number; impressions: number; engagement: number; }
@@ -35,10 +36,10 @@ export default function AnalyticsPage() {
   }));
 
   const stats = [
-    { label: 'Total Views',       value: overview.total_views ?? 0,       icon: Eye,        color: '#A855F7' },
-    { label: 'Impressions',       value: overview.total_impressions ?? 0, icon: TrendingUp, color: '#3B82F6' },
-    { label: 'Engagements',       value: overview.total_engagement ?? 0,  icon: Heart,      color: '#EC4899' },
-    { label: 'Avg Viewers',       value: Math.round((overview.total_views ?? 0) / 7),      icon: Users,      color: '#10B981' },
+    { label: 'Total Views',       value: overview.total_views ?? 0,       icon: Eye,        color: palette.primary },
+    { label: 'Impressions',       value: overview.total_impressions ?? 0, icon: TrendingUp, color: palette.primaryDeep },
+    { label: 'Engagements',       value: overview.total_engagement ?? 0,  icon: Heart,      color: palette.accent },
+    { label: 'Avg Viewers',       value: Math.round((overview.total_views ?? 0) / 7),      icon: Users,      color: palette.success },
   ];
 
   return (
@@ -69,20 +70,20 @@ export default function AnalyticsPage() {
             <AreaChart data={trendData}>
               <defs>
                 <linearGradient id="v" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#A855F7" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#A855F7" stopOpacity={0} />
+                  <stop offset="0%" stopColor={palette.primary} stopOpacity={0.5} />
+                  <stop offset="100%" stopColor={palette.primary} stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="i" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+                  <stop offset="0%" stopColor={palette.primaryDeep} stopOpacity={0.5} />
+                  <stop offset="100%" stopColor={palette.primaryDeep} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="day" stroke="#8B87A6" fontSize={12} />
-              <YAxis stroke="#8B87A6" fontSize={12} />
-              <Tooltip contentStyle={{ background: '#14102A', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 12 }} />
-              <Area type="monotone" dataKey="views"       stroke="#A855F7" fill="url(#v)" strokeWidth={2} />
-              <Area type="monotone" dataKey="impressions" stroke="#3B82F6" fill="url(#i)" strokeWidth={2} />
+              <CartesianGrid strokeDasharray={chartAxis.gridDash} stroke={chartAxis.gridStroke} />
+              <XAxis dataKey="day" stroke={chartAxis.stroke} fontSize={12} />
+              <YAxis stroke={chartAxis.stroke} fontSize={12} />
+              <Tooltip contentStyle={chartTooltip} />
+              <Area type="monotone" dataKey="views"       stroke={palette.primary}     fill="url(#v)" strokeWidth={2} />
+              <Area type="monotone" dataKey="impressions" stroke={palette.primaryDeep} fill="url(#i)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -97,14 +98,14 @@ export default function AnalyticsPage() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={platforms}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="platform" stroke="#8B87A6" fontSize={12} />
-                <YAxis stroke="#8B87A6" fontSize={12} />
-                <Tooltip contentStyle={{ background: '#14102A', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 12 }} />
+                <CartesianGrid strokeDasharray={chartAxis.gridDash} stroke={chartAxis.gridStroke} />
+                <XAxis dataKey="platform" stroke={chartAxis.stroke} fontSize={12} />
+                <YAxis stroke={chartAxis.stroke} fontSize={12} />
+                <Tooltip contentStyle={chartTooltip} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="views"       fill="#A855F7" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="impressions" fill="#3B82F6" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="engagement"  fill="#EC4899" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="views"       fill={palette.primary}     radius={[6, 6, 0, 0]} />
+                <Bar dataKey="impressions" fill={palette.primaryDeep} radius={[6, 6, 0, 0]} />
+                <Bar dataKey="engagement"  fill={palette.accent}      radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

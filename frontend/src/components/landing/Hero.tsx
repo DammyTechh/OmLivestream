@@ -93,7 +93,7 @@ export function Hero() {
               // Logged in user — show dashboard + go live CTAs
               <div className="mt-8 space-y-3 max-w-md">
                 <p className="text-text/90 text-base">
-                  Welcome back{userName ? `, ${userName}` : ''} 👋
+                  Welcome back{userName ? `, ${userName}` : ''}
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <Link

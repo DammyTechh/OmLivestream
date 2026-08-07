@@ -274,6 +274,6 @@ func main() {
 	mux.HandleFunc("/relay/status",  requireSecret(handleStatus))
 
 	addr := ":" + port
-	log.Printf("🚀 OmliveStream RTMP Relay listening on %s", addr)
+	log.Printf("OmliveStream RTMP Relay listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }

@@ -132,7 +132,7 @@ const publishWorker = new Worker('video-publish', async (job) => {
 editWorker.on('failed',   (j, e) => logger.error({ jobId: j?.id, err: e.message }, 'Edit job failed'));
 publishWorker.on('failed',(j, e) => logger.error({ jobId: j?.id, err: e.message }, 'Publish job failed'));
 
-console.log('🔧 BullMQ workers started (video-edit, video-publish)');
+console.log('BullMQ workers started (video-edit, video-publish)');
 
 // Import broadcast worker (runs in same process)
 import '../jobs/broadcast.worker';

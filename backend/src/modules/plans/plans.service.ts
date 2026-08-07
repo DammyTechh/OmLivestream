@@ -50,19 +50,101 @@ export const PLAN_LIMITS: Record<PlanType, {
   },
 };
 
+export interface EffectivePlan {
+  plan:          PlanType;
+  trialActive:   boolean;
+  trialDaysLeft: number | null;
+  trialExpired:  boolean;
+  limits:        typeof PLAN_LIMITS[PlanType];
+}
+
+export interface UpgradePopup {
+  show:        boolean;
+  type:        'trial_ending' | 'trial_expired' | 'free_limit' | null;
+  title:       string;
+  message:     string;
+  cta:         string;
+  ctaUrl:      string;
+  daysLeft:    number | null;
+  /** trial_ending popups can be dismissed; hard limits cannot */
+  dismissible: boolean;
+}
+
+const NO_POPUP: UpgradePopup = {
+  show: false, type: null, title: '', message: '', cta: '', ctaUrl: '',
+  daysLeft: null, dismissible: true,
+};
+
+/**
+ * Decide which upgrade prompt a plan state warrants.
+ *
+ * Pure: takes an already-resolved plan rather than a userId, so a caller that
+ * has one can render the popup without a second identical `users` read. This
+ * matters because /plans/my-plan is documented as being called on every
+ * dashboard load — it was the most-repeated query in the system.
+ */
+export function buildUpgradePopup(info: EffectivePlan): UpgradePopup {
+  const { plan, limits, trialDaysLeft, trialExpired, trialActive } = info;
+
+  if (plan === 'premium') return NO_POPUP;
+
+  // Trial ending in 7 days or less
+  if (plan === 'free_trial' && trialActive && trialDaysLeft !== null && trialDaysLeft <= 7) {
+    return {
+      show:        true,
+      type:        'trial_ending',
+      title:       `Your free trial ends in ${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''}`,
+      message:     `Don't lose access to 2-platform streaming. Upgrade now and keep full access — no interruptions.`,
+      cta:         'Upgrade to Premium',
+      ctaUrl:      '/billing',
+      daysLeft:    trialDaysLeft,
+      dismissible: true,
+    };
+  }
+
+  // Trial just expired
+  if (trialExpired) {
+    return {
+      show:        true,
+      type:        'trial_expired',
+      title:       'Your free trial has ended',
+      message:     `You're now on the Free plan (1 platform). Upgrade to Premium to stream to all 8 platforms, reply to comments, and unlock unlimited streams.`,
+      cta:         'Upgrade to Premium',
+      ctaUrl:      '/billing',
+      daysLeft:    0,
+      dismissible: false,
+    };
+  }
+
+  // Free plan hitting limits (shown when they try to add platforms or reply)
+  if (plan === 'free' && limits.showUpgradePopup) {
+    return {
+      show:        true,
+      type:        'free_limit',
+      title:       'Unlock the full OmliveStream experience',
+      message:     `You're on the Free plan — stream to 1 platform with view-only comments. Upgrade to Premium for all 8 platforms, live comment replies, and 365-day recording storage.`,
+      cta:         'See Premium Plans',
+      ctaUrl:      '/billing',
+      daysLeft:    null,
+      dismissible: true,
+    };
+  }
+
+  return NO_POPUP;
+}
+
 export class PlansService {
 
   /**
    * Get effective plan for a user, considering trial expiry.
    * If trial has expired, returns 'free' regardless of DB value.
+   *
+   * This is the single read every plan decision depends on, so it is also
+   * the one most worth not repeating. Callers that need several plan checks
+   * in one request should call this once and pass the result down rather
+   * than letting each enforcer re-fetch it.
    */
-  async getEffectivePlan(userId: string): Promise<{
-    plan:              PlanType;
-    trialActive:       boolean;
-    trialDaysLeft:     number | null;
-    trialExpired:      boolean;
-    limits:            typeof PLAN_LIMITS[PlanType];
-  }> {
+  async getEffectivePlan(userId: string): Promise<EffectivePlan> {
     const { data: user } = await supabaseAdmin
       .from('users')
       .select('plan, trial_started_at, trial_expires_at')
@@ -103,9 +185,12 @@ export class PlansService {
   /**
    * Enforce: how many platforms can this user stream to?
    * Throws a clear error if they exceed their plan limit.
+   *
+   * `known` lets the go-live path resolve the plan once and run both
+   * enforcers against it instead of reading the same row twice.
    */
-  async enforcePlatformLimit(userId: string, requestedPlatforms: string[]): Promise<void> {
-    const { plan, limits, trialDaysLeft } = await this.getEffectivePlan(userId);
+  async enforcePlatformLimit(userId: string, requestedPlatforms: string[], known?: EffectivePlan): Promise<void> {
+    const { plan, limits, trialDaysLeft } = known ?? await this.getEffectivePlan(userId);
 
     if (requestedPlatforms.length > limits.maxStreamPlatforms) {
       const trialNote = plan === 'free_trial' && trialDaysLeft !== null
@@ -125,8 +210,8 @@ export class PlansService {
   /**
    * Enforce: can this user reply to comments?
    */
-  async enforceCommentReply(userId: string): Promise<void> {
-    const { limits } = await this.getEffectivePlan(userId);
+  async enforceCommentReply(userId: string, known?: EffectivePlan): Promise<void> {
+    const { limits } = known ?? await this.getEffectivePlan(userId);
     if (!limits.canReplyComments) {
       throw new PremiumRequiredError('Comment replies');
     }
@@ -135,8 +220,8 @@ export class PlansService {
   /**
    * Enforce: daily stream count limit.
    */
-  async enforceDailyStreamLimit(userId: string): Promise<void> {
-    const { plan, limits } = await this.getEffectivePlan(userId);
+  async enforceDailyStreamLimit(userId: string, known?: EffectivePlan): Promise<void> {
+    const { plan, limits } = known ?? await this.getEffectivePlan(userId);
     if (plan === 'premium') return; // unlimited
 
     const startOfDay = new Date();
@@ -159,66 +244,12 @@ export class PlansService {
 
   /**
    * Returns the upgrade popup config for free/trial users.
-   * Returns null for premium users (no popup).
    * Called by the frontend before or during a live session.
+   *
+   * Pass `known` when the caller already resolved the plan, to avoid a
+   * second identical read.
    */
-  async getUpgradePopup(userId: string): Promise<{
-    show:         boolean;
-    type:         'trial_ending' | 'trial_expired' | 'free_limit' | null;
-    title:        string;
-    message:      string;
-    cta:          string;
-    ctaUrl:       string;
-    daysLeft:     number | null;
-    dismissible:  boolean;  // trial_ending popups can be dismissed; hard limits cannot
-  } | null> {
-    const { plan, limits, trialDaysLeft, trialExpired, trialActive } =
-      await this.getEffectivePlan(userId);
-
-    if (plan === 'premium') return { show: false, type: null, title: '', message: '', cta: '', ctaUrl: '', daysLeft: null, dismissible: true };
-
-    // Trial ending in 7 days or less
-    if (plan === 'free_trial' && trialActive && trialDaysLeft !== null && trialDaysLeft <= 7) {
-      return {
-        show:        true,
-        type:        'trial_ending',
-        title:       `⏳ Your free trial ends in ${trialDaysLeft} day${trialDaysLeft !== 1 ? 's' : ''}`,
-        message:     `Don't lose access to 2-platform streaming. Upgrade now and keep full access — no interruptions.`,
-        cta:         'Upgrade to Premium',
-        ctaUrl:      '/billing',
-        daysLeft:    trialDaysLeft,
-        dismissible: true,
-      };
-    }
-
-    // Trial just expired
-    if (trialExpired) {
-      return {
-        show:        true,
-        type:        'trial_expired',
-        title:       '🎯 Your free trial has ended',
-        message:     `You're now on the Free plan (1 platform). Upgrade to Premium to stream to all 8 platforms, reply to comments, and unlock unlimited streams.`,
-        cta:         'Upgrade to Premium',
-        ctaUrl:      '/billing',
-        daysLeft:    0,
-        dismissible: false,
-      };
-    }
-
-    // Free plan hitting limits (shown when they try to add platforms or reply)
-    if (plan === 'free' && limits.showUpgradePopup) {
-      return {
-        show:        true,
-        type:        'free_limit',
-        title:       '🚀 Unlock the full OmliveStream experience',
-        message:     `You're on the Free plan — stream to 1 platform with view-only comments. Upgrade to Premium for all 8 platforms, live comment replies, and 365-day recording storage.`,
-        cta:         'See Premium Plans',
-        ctaUrl:      '/billing',
-        daysLeft:    null,
-        dismissible: true,
-      };
-    }
-
-    return { show: false, type: null, title: '', message: '', cta: '', ctaUrl: '', daysLeft: null, dismissible: true };
+  async getUpgradePopup(userId: string, known?: EffectivePlan): Promise<UpgradePopup> {
+    return buildUpgradePopup(known ?? await this.getEffectivePlan(userId));
   }
 }

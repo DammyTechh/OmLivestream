@@ -7,6 +7,8 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft, Camera, CameraOff, Mic, MicOff, Image as ImageIcon, User as UserIcon,
   Radio, Upload, Wifi, WifiOff, Settings2, Sparkles, Monitor,
+  Gauge, RefreshCw, AlertTriangle, CheckCircle2, Activity,
+  Gamepad2, Palette, Clapperboard, Headphones, Music, Flame, Presentation,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
@@ -16,10 +18,10 @@ import { api, unwrap, getApiError } from '@/lib/api';
 import {
   YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon, XIcon, LinkedInIcon, KickIcon,
 } from '@/components/ui/BrandIcons';
+import { measureNetwork, type Progress, type RawMeasurement } from '@/lib/network-test';
 
 type SourceMode = 'camera' | 'avatar' | 'image';
 type Filter = 'none' | 'grayscale' | 'sepia' | 'cool' | 'warm' | 'vivid';
-type NetQuality = 'excellent' | 'good' | 'fair' | 'poor' | 'unknown';
 
 const PLATFORMS = [
   { id: 'youtube',   label: 'YouTube',   Icon: YouTubeIcon   },
@@ -41,9 +43,55 @@ const FILTERS: { id: Filter; label: string; css: string }[] = [
   { id: 'vivid',     label: 'Vivid',     css: 'saturate(1.5) contrast(1.1)' },
 ];
 
+/**
+ * Avatar options for creators who stream without a camera.
+ *
+ * These were emoji. Emoji render differently on every platform — the same
+ * stream looked like a different brand on Windows, macOS and Android — and
+ * they read as unfinished. Line icons render identically everywhere and
+ * inherit the theme colour.
+ */
 const AVATARS = [
-  '🎮', '🎤', '🎨', '🎬', '🎧', '📸', '✨', '🔥',
+  { id: 'gaming',   label: 'Gaming',   Icon: Gamepad2     },
+  { id: 'music',    label: 'Music',    Icon: Music        },
+  { id: 'art',      label: 'Art',      Icon: Palette      },
+  { id: 'film',     label: 'Film',     Icon: Clapperboard },
+  { id: 'podcast',  label: 'Podcast',  Icon: Headphones   },
+  { id: 'photo',    label: 'Photo',    Icon: ImageIcon    },
+  { id: 'talk',     label: 'Talk',     Icon: Presentation },
+  { id: 'trending', label: 'Trending', Icon: Flame        },
 ];
+
+/** Mirrors NetworkTestResult from the backend's network.service. */
+interface NetworkAnalysis {
+  uploadMbps:        number;
+  latencyMs:         number;
+  jitterMs:          number;
+  packetLossPercent: number;
+  recommended: {
+    tier:             string;
+    resolution:       string;
+    frameRate:        number;
+    videoBitrateKbps: number;
+    audioBitrateKbps: number;
+    label:            string;
+    description:      string;
+  };
+  platformSupport: { platform: string; supported: boolean; maxQuality: string; note?: string }[];
+  statusColor:     'green' | 'yellow' | 'orange' | 'red';
+  statusMessage:   string;
+  tips:            string[];
+  canStream:       boolean;
+  adaptiveEnabled: boolean;
+}
+
+/** Maps the backend's status colour onto theme tokens. */
+const STATUS_STYLES: Record<NetworkAnalysis['statusColor'], { chip: string; dot: string; text: string }> = {
+  green:  { chip: 'bg-success/15 text-success', dot: 'bg-success', text: 'text-success' },
+  yellow: { chip: 'bg-warning/15 text-warning', dot: 'bg-warning', text: 'text-warning' },
+  orange: { chip: 'bg-warning/15 text-warning', dot: 'bg-warning', text: 'text-warning' },
+  red:    { chip: 'bg-danger/15 text-danger',   dot: 'bg-danger',  text: 'text-danger'  },
+};
 
 export default function NewStreamPage() {
   const router = useRouter();
@@ -64,13 +112,14 @@ export default function NewStreamPage() {
   useLiveStreamGuard(cameraOn);
   const [micOn, setMicOn] = useState(true);
   const [filter, setFilter] = useState<Filter>('none');
-  const [avatar, setAvatar] = useState('🎮');
+  const [avatar, setAvatar] = useState('gaming');
   const [staticImage, setStaticImage] = useState<string | null>(null);
 
-  // Network
-  const [network, setNetwork] = useState<{ mbps: number | null; quality: NetQuality }>({
-    mbps: null, quality: 'unknown',
-  });
+  // Network pre-flight
+  const [netRunning,  setNetRunning]  = useState(false);
+  const [netProgress, setNetProgress] = useState<Progress | null>(null);
+  const [netResult,   setNetResult]   = useState<NetworkAnalysis | null>(null);
+  const [netError,    setNetError]    = useState<string | null>(null);
 
   // Stream keys (per-platform) — when user doesn't want to OAuth
   const [showKeysFor, setShowKeysFor] = useState<string | null>(null);
@@ -115,25 +164,49 @@ export default function NewStreamPage() {
     };
   }, []);
 
-  // ─── Network quality estimate (simple heuristic using Network Info API + download test) ──
-  useEffect(() => {
-    const nav: any = navigator;
-    const conn = nav.connection || nav.mozConnection || nav.webkitConnection;
-    if (conn?.downlink) {
-      const mbps = conn.downlink;
-      setNetwork({
-        mbps,
-        quality: mbps >= 10 ? 'excellent' : mbps >= 5 ? 'good' : mbps >= 2 ? 'fair' : 'poor',
-      });
-    }
-  }, []);
+  // ─── Network pre-flight check ──────────────────────────────────
+  /**
+   * Runs a real measurement, then asks the backend which quality tier
+   * that connection can actually sustain.
+   *
+   * This replaces a read of `navigator.connection.downlink`, which was
+   * wrong in three separate ways: it is a *download* estimate (streaming is
+   * bound by upload), it is a coarse rounded guess rather than a
+   * measurement, and it does not exist at all in Safari or Firefox — where
+   * the old code silently left the user on "checking…" forever.
+   *
+   * Not run on mount: it moves real data and takes a few seconds, so it is
+   * user-initiated, and re-runnable when they change networks.
+   */
+  const runNetworkCheck = async () => {
+    if (netRunning) return;
+    setNetRunning(true);
+    setNetError(null);
+    setNetResult(null);
 
-  const recommendedQuality =
-    network.quality === 'excellent' ? '1080p @ 60fps · 6 Mbps' :
-    network.quality === 'good'      ? '1080p @ 30fps · 4 Mbps' :
-    network.quality === 'fair'      ? '720p @ 30fps · 2.5 Mbps' :
-    network.quality === 'poor'      ? '480p @ 30fps · 1 Mbps' :
-                                      'Checking…';
+    try {
+      const raw: RawMeasurement = await measureNetwork(selected, setNetProgress);
+      const analysis = unwrap<NetworkAnalysis>(
+        await api.post('/streams/network-check', {
+          ...raw,
+          selectedPlatforms: selected,
+        })
+      );
+      setNetResult(analysis);
+    } catch (err) {
+      setNetError(getApiError(err, 'Could not measure your connection. Please try again.'));
+    } finally {
+      setNetRunning(false);
+      setNetProgress(null);
+    }
+  };
+
+  // A result measured against three platforms is not valid for six. Rather
+  // than show a stale recommendation, clear it and let the user re-run.
+  const platformKey = selected.join(',');
+  useEffect(() => {
+    setNetResult(null);
+  }, [platformKey]);
 
   // ─── Image upload ─────────────────────────────────────────────
   const handleStaticImage = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,7 +287,16 @@ export default function NewStreamPage() {
             )}
             {sourceMode === 'avatar' && (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 via-accent/10 to-primary-deep/20">
-                <div className="text-[180px] drop-shadow-[0_0_60px_rgba(168,85,247,0.5)]">{avatar}</div>
+                {(() => {
+                  const A = AVATARS.find((a) => a.id === avatar) ?? AVATARS[0];
+                  return (
+                    <A.Icon
+                      size={140}
+                      strokeWidth={1.25}
+                      className="text-white drop-shadow-[0_0_60px_rgba(168,85,247,0.5)]"
+                    />
+                  );
+                })()}
               </div>
             )}
             {sourceMode === 'image' && staticImage && (
@@ -314,16 +396,22 @@ export default function NewStreamPage() {
           {sourceMode === 'avatar' && (
             <Card className="p-5">
               <h3 className="text-sm font-semibold mb-3">Pick your avatar</h3>
-              <div className="grid grid-cols-8 gap-2">
+              <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
                 {AVATARS.map((a) => (
                   <button
-                    key={a}
-                    onClick={() => setAvatar(a)}
-                    className={`aspect-square text-3xl rounded-xl transition ${
-                      avatar === a ? 'bg-primary/20 ring-2 ring-primary' : 'bg-white/5 hover:bg-white/10'
+                    key={a.id}
+                    onClick={() => setAvatar(a.id)}
+                    title={a.label}
+                    aria-label={a.label}
+                    aria-pressed={avatar === a.id}
+                    className={`aspect-square rounded-xl transition flex flex-col items-center justify-center gap-1 ${
+                      avatar === a.id
+                        ? 'bg-primary/20 ring-2 ring-primary text-text'
+                        : 'bg-white/5 hover:bg-white/10 text-muted hover:text-text'
                     }`}
                   >
-                    {a}
+                    <a.Icon size={20} strokeWidth={1.5} />
+                    <span className="text-[10px] font-medium">{a.label}</span>
                   </button>
                 ))}
               </div>
@@ -347,27 +435,127 @@ export default function NewStreamPage() {
             </Card>
           )}
 
-          {/* Network quality */}
+          {/* Network pre-flight check */}
           <Card className="p-5">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  network.quality === 'excellent' || network.quality === 'good' ? 'bg-success/15 text-success' :
-                  network.quality === 'fair'                                    ? 'bg-warning/15 text-warning' :
-                  network.quality === 'poor'                                    ? 'bg-danger/15 text-danger' :
-                                                                                  'bg-white/5 text-muted'
+                  netResult ? STATUS_STYLES[netResult.statusColor].chip
+                            : netError ? 'bg-danger/15 text-danger'
+                                       : 'bg-white/5 text-muted'
                 }`}>
-                  {network.quality === 'poor' ? <WifiOff size={16} /> : <Wifi size={16} />}
+                  {netError            ? <WifiOff size={16} />
+                   : netRunning        ? <Activity size={16} className="animate-pulse" />
+                   : netResult         ? <Wifi size={16} />
+                                       : <Gauge size={16} />}
                 </div>
                 <div>
-                  <div className="text-sm font-semibold capitalize">
-                    Network: {network.quality === 'unknown' ? 'checking…' : network.quality}
-                    {network.mbps && ` · ${network.mbps.toFixed(1)} Mbps`}
-                  </div>
-                  <div className="text-xs text-muted">Recommended: {recommendedQuality}</div>
+                  <h3 className="text-sm font-semibold">Connection check</h3>
+                  <p className="text-xs text-muted">
+                    {netRunning ? (netProgress?.note ?? 'Measuring…')
+                     : netError  ? netError
+                     : netResult ? netResult.statusMessage
+                                 : 'Measure your real upload speed before going live.'}
+                  </p>
                 </div>
               </div>
+
+              <Button
+                onClick={runNetworkCheck}
+                loading={netRunning}
+                variant="secondary"
+                size="sm"
+                icon={netResult || netError ? <RefreshCw size={13} /> : <Gauge size={13} />}
+                className="shrink-0"
+              >
+                {netRunning ? 'Testing' : netResult || netError ? 'Re-test' : 'Test now'}
+              </Button>
             </div>
+
+            {/* Progress bar — the test moves real data and takes a few
+                seconds, so silence here reads as a hang. */}
+            {netRunning && (
+              <div className="mt-4">
+                <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full bg-primary"
+                    animate={{ width: `${netProgress?.percent ?? 0}%` }}
+                    transition={{ ease: 'easeOut', duration: 0.3 }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {netResult && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-5 space-y-4"
+              >
+                {/* Measured values */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { label: 'Upload',  value: `${netResult.uploadMbps.toFixed(1)}`, unit: 'Mbps' },
+                    { label: 'Latency', value: `${netResult.latencyMs}`,             unit: 'ms'   },
+                    { label: 'Jitter',  value: `${netResult.jitterMs}`,              unit: 'ms'   },
+                    { label: 'Loss',    value: `${netResult.packetLossPercent}`,     unit: '%'    },
+                  ].map((m) => (
+                    <div key={m.label} className="rounded-xl bg-white/[0.03] border border-white/5 px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wide text-muted">{m.label}</div>
+                      <div className="text-sm font-semibold tabular-nums">
+                        {m.value}<span className="text-muted font-normal text-xs ml-0.5">{m.unit}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Recommended tier */}
+                <div className="rounded-xl border border-primary/20 bg-primary/[0.06] px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-primary shrink-0" />
+                    <span className="text-sm font-semibold">{netResult.recommended.label}</span>
+                    <span className="text-xs text-muted tabular-nums">
+                      · {netResult.recommended.videoBitrateKbps > 0
+                          ? `${(netResult.recommended.videoBitrateKbps / 1000).toFixed(1)} Mbps video`
+                          : 'audio only'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted mt-1.5">{netResult.recommended.description}</p>
+                </div>
+
+                {/* Per-platform ceilings — only where a platform caps below
+                    what the connection could otherwise carry. */}
+                {netResult.platformSupport.some((p) => p.note) && (
+                  <div className="space-y-1.5">
+                    {netResult.platformSupport.filter((p) => p.note).map((p) => (
+                      <div key={p.platform} className="flex items-start gap-2 text-xs text-muted">
+                        <AlertTriangle size={12} className="text-warning shrink-0 mt-0.5" />
+                        <span className="capitalize">{p.note}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Actionable tips */}
+                {netResult.tips.length > 0 && (
+                  <div className="space-y-1.5">
+                    {netResult.tips.map((tip) => (
+                      <div key={tip} className="flex items-start gap-2 text-xs text-muted">
+                        <span className={`w-1 h-1 rounded-full shrink-0 mt-1.5 ${STATUS_STYLES[netResult.statusColor].dot}`} />
+                        <span>{tip}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {netResult.adaptiveEnabled && (
+                  <p className="text-[11px] text-muted border-t border-border pt-3">
+                    Adaptive quality is on. If your connection dips mid-stream, we lower the
+                    bitrate automatically rather than dropping the broadcast.
+                  </p>
+                )}
+              </motion.div>
+            )}
           </Card>
         </div>
 

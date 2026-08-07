@@ -16,25 +16,51 @@ import { env } from '../../config/env';
 import { logger } from '../../config/logger';
 import { AppError, NotFoundError } from '../../utils/errors';
 
-// ── Codec config — supports VP8, H264, Opus ────────────────────────
+// ── Codec config ───────────────────────────────────────────────────
+// H264 is listed FIRST deliberately. RTMP/FLV — which every platform
+// ingests — only accepts H264 video. When the browser produces H264 we
+// can forward with `-c:v copy` (zero transcoding, near-zero CPU). If it
+// produces VP8 we are forced to transcode, which costs ~1 core per
+// stream. mediasoup-client picks the first mutually supported codec, so
+// ordering here is what keeps us in the copy path.
+//
+// rtcpFeedback is populated (was empty) so congestion control actually
+// works — without NACK/PLI/REMB the browser never retransmits lost
+// packets and never receives bitrate feedback.
 const MEDIA_CODECS: mediasoup.types.RtpCodecCapability[] = [
+  {
+    kind: 'video', mimeType: 'video/H264', clockRate: 90000,
+    preferredPayloadType: 125,
+    parameters: {
+      'packetization-mode': 1,
+      'profile-level-id': '42e01f',
+      'level-asymmetry-allowed': 1,
+    },
+    rtcpFeedback: [
+      { type: 'nack' },
+      { type: 'nack', parameter: 'pli' },
+      { type: 'ccm',  parameter: 'fir' },
+      { type: 'goog-remb' },
+      { type: 'transport-cc' },
+    ],
+  },
   {
     kind: 'video', mimeType: 'video/VP8', clockRate: 90000,
     preferredPayloadType: 96,
     parameters: {},
-    rtcpFeedback: [],
-  },
-  {
-    kind: 'video', mimeType: 'video/H264', clockRate: 90000,
-    preferredPayloadType: 125,
-    parameters: { 'packetization-mode': 1, 'profile-level-id': '42e01f', 'level-asymmetry-allowed': 1 },
-    rtcpFeedback: [],
+    rtcpFeedback: [
+      { type: 'nack' },
+      { type: 'nack', parameter: 'pli' },
+      { type: 'ccm',  parameter: 'fir' },
+      { type: 'goog-remb' },
+      { type: 'transport-cc' },
+    ],
   },
   {
     kind: 'audio', mimeType: 'audio/opus', clockRate: 48000, channels: 2,
     preferredPayloadType: 111,
     parameters: { 'sprop-stereo': 1, useinbandfec: 1, usedtx: 1 },
-    rtcpFeedback: [],
+    rtcpFeedback: [{ type: 'transport-cc' }],
   },
 ];
 
@@ -44,6 +70,25 @@ const routers:   Map<string, mediasoup.types.Router>               = new Map(); 
 const transports:Map<string, mediasoup.types.WebRtcTransport>      = new Map(); // transportId → Transport
 const producers: Map<string, mediasoup.types.Producer>             = new Map(); // producerId → Producer
 let   workerIdx  = 0;
+
+// transportId → streamId, and streamId → its producers.
+// The RTP bridge needs to find "the video producer for stream X" when the
+// stream goes live; without this mapping producers are an undifferentiated
+// pool and there is no way to know which tracks belong to which broadcast.
+const transportStream: Map<string, string> = new Map();
+const streamProducers: Map<string, { video?: string; audio?: string }> = new Map();
+
+export function getStreamProducers(streamId: string): {
+  video?: mediasoup.types.Producer;
+  audio?: mediasoup.types.Producer;
+} {
+  const ids = streamProducers.get(streamId);
+  if (!ids) return {};
+  return {
+    video: ids.video ? producers.get(ids.video) : undefined,
+    audio: ids.audio ? producers.get(ids.audio) : undefined,
+  };
+}
 
 // ── Worker pool ────────────────────────────────────────────────────
 
@@ -90,6 +135,20 @@ export function getRouter(streamId: string): mediasoup.types.Router | undefined 
 export function closeRouter(streamId: string): void {
   const router = routers.get(streamId);
   if (router) {
+    // Closing the Router cascades to its transports, producers and
+    // consumers, but the lookup maps are ours to clean up.
+    const ids = streamProducers.get(streamId);
+    if (ids?.video) producers.delete(ids.video);
+    if (ids?.audio) producers.delete(ids.audio);
+    streamProducers.delete(streamId);
+
+    for (const [tid, sid] of transportStream) {
+      if (sid === streamId) {
+        transports.delete(tid);
+        transportStream.delete(tid);
+      }
+    }
+
     router.close();
     routers.delete(streamId);
     logger.info({ streamId }, 'mediasoup Router closed');
@@ -126,10 +185,12 @@ export async function createWebRtcTransport(streamId: string): Promise<Transport
     if (state === 'failed' || state === 'closed') {
       transport.close();
       transports.delete(transport.id);
+      transportStream.delete(transport.id);
     }
   });
 
   transports.set(transport.id, transport);
+  transportStream.set(transport.id, streamId);
   logger.debug({ streamId, transportId: transport.id }, 'WebRTC transport created');
 
   return {
@@ -172,8 +233,14 @@ export async function createProducer(
     keyFrameRequestDelay: 0,
   });
 
+  const streamId = transportStream.get(transportId);
+
   producer.on('transportclose', () => {
     producers.delete(producer.id);
+    if (streamId) {
+      const entry = streamProducers.get(streamId);
+      if (entry?.[kind] === producer.id) delete entry[kind];
+    }
   });
 
   producer.on('score', (score) => {
@@ -181,7 +248,18 @@ export async function createProducer(
   });
 
   producers.set(producer.id, producer);
-  logger.info({ transportId, producerId: producer.id, kind }, 'Producer created');
+
+  // Record which stream this track belongs to so the RTP bridge can find it.
+  if (streamId) {
+    const entry = streamProducers.get(streamId) ?? {};
+    entry[kind] = producer.id;
+    streamProducers.set(streamId, entry);
+  } else {
+    logger.warn({ transportId, producerId: producer.id },
+      'Producer created on a transport with no stream mapping — RTP bridge will not find it');
+  }
+
+  logger.info({ transportId, streamId, producerId: producer.id, kind }, 'Producer created');
 
   return { producerId: producer.id };
 }

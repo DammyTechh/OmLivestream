@@ -126,6 +126,43 @@ export const redis = {
     }
   },
 
+  async decr(key: string): Promise<number> {
+    try {
+      const n = await upstash.decr(key);
+      noteSuccess();
+      return n;
+    } catch (err) {
+      noteFailure('decr', err);
+      const e   = mem.get(key);
+      const cur = alive(e) ? parseInt(e.value, 10) || 0 : 0;
+      const next = cur - 1;
+      mem.set(key, { value: String(next), expiresAt: alive(e) ? e.expiresAt : null });
+      return next;
+    }
+  },
+
+  /**
+   * Atomic set-if-absent, for locks that must hold across instances.
+   *
+   * Returns null — not false — when Upstash is unreachable, because the
+   * in-process fallback genuinely cannot answer this question: each instance
+   * has its own Map, so every instance would "acquire" the same lock and the
+   * guarantee the caller wanted would silently evaporate. Callers must decide
+   * what that ambiguity means for them. This is the same reasoning as the
+   * OAuth state keys above: where a wrong answer is worse than no answer,
+   * the facade declines to guess.
+   */
+  async setnx(key: string, value: string | number, ttlSec: number): Promise<boolean | null> {
+    try {
+      const res = await upstash.set(key, value, { nx: true, ex: ttlSec });
+      noteSuccess();
+      return res === 'OK';
+    } catch (err) {
+      noteFailure('setnx', err);
+      return null;
+    }
+  },
+
   async expire(key: string, seconds: number): Promise<void> {
     try {
       await upstash.expire(key, seconds);
@@ -200,11 +237,77 @@ export function createBullConnection() {
 /** Is BullMQ available? Workers/queues should check this before registering. */
 export const BULLMQ_ENABLED = !!env.UPSTASH_REDIS_URL;
 
+/**
+ * Dedicated TCP client pair for the Socket.io Redis adapter.
+ *
+ * Not shared with the BullMQ connection, and not one client reused twice:
+ * a Redis client that has issued SUBSCRIBE enters subscriber mode and will
+ * refuse every other command, so sharing would silently break job queueing
+ * the moment the adapter subscribed.
+ *
+ * Returns null when UPSTASH_REDIS_URL is unset. The REST client the rest of
+ * this file uses cannot carry pub/sub — it is request/response only — so
+ * without a TCP URL there is no adapter and the process must run as a single
+ * instance. The caller is responsible for saying so out loud.
+ */
+export function createSocketAdapterClients(): { pub: any; sub: any } | null {
+  if (!env.UPSTASH_REDIS_URL) return null;
+
+  const IORedis = require('ioredis');
+  const opts = {
+    maxRetriesPerRequest: null,   // required: the adapter must not fail fast
+    enableReadyCheck:     false,
+    tls:                  { rejectUnauthorized: false },
+    connectTimeout:       5000,
+  };
+  const pub = new IORedis(env.UPSTASH_REDIS_URL, opts);
+  const sub = pub.duplicate();
+
+  // Log rather than swallow: a dead adapter means rooms stop spanning
+  // instances, and viewers silently miss comments. That must be visible.
+  pub.on('error', (err: Error) => logger.error({ err }, 'Socket.io Redis adapter (pub) error'));
+  sub.on('error', (err: Error) => logger.error({ err }, 'Socket.io Redis adapter (sub) error'));
+
+  return { pub, sub };
+}
+
+/**
+ * Client for @fastify/rate-limit's Redis store.
+ *
+ * Separate from both the BullMQ and the Socket.io adapter connections, and
+ * deliberately configured to fail fast: `connectTimeout` is short and
+ * `enableOfflineQueue` is false, because a request must never sit waiting on
+ * the rate limiter. When Redis is down the plugin falls back to its local
+ * store, which is a far better outcome than a stalled API.
+ *
+ * Returns null when no TCP URL is configured — the REST client cannot serve
+ * this, as the plugin needs a node_redis/ioredis-compatible interface.
+ */
+export function createRateLimitRedis(): any {
+  if (!env.UPSTASH_REDIS_URL) return null;
+
+  const IORedis = require('ioredis');
+  const client = new IORedis(env.UPSTASH_REDIS_URL, {
+    maxRetriesPerRequest: 1,
+    enableReadyCheck:     false,
+    enableOfflineQueue:   false,
+    tls:                  { rejectUnauthorized: false },
+    connectTimeout:       3000,
+    lazyConnect:          true,
+  });
+  // Warn, don't crash: the plugin degrades to its in-process store by itself.
+  client.on('error', (err: Error) =>
+    logger.warn({ err }, 'Rate-limit Redis error — falling back to per-instance counters'));
+  return client;
+}
+
 export const REDIS_KEYS = {
   OTP_ATTEMPTS:     (userId: string)      => `otp:attempts:${userId}`,
   OTP_RATE:         (email: string)       => `otp:rate:${email}`,
   OAUTH_STATE:      (state: string)       => `oauth:state:${state}`,
+  CRON_LOCK:        (job: string, day: string) => `cron:lock:${job}:${day}`,
   STREAM_VIEWERS:   (streamId: string)    => `stream:viewers:${streamId}`,
+  STREAM_LIVE:      (streamId: string)    => `stream:live:${streamId}`,
   STREAM_BITRATE:   (streamId: string)    => `stream:bitrate:${streamId}`,
   WEBRTC_TRANSPORT: (transportId: string) => `webrtc:transport:${transportId}`,
 } as const;

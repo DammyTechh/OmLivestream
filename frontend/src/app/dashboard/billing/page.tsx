@@ -68,7 +68,7 @@ function CodeRedeemBox({ onRedeemed }: { onRedeemed: () => void }) {
     setRedeeming(true);
     try {
       await api.post('/billing/redeem-code', { code: preview.code });
-      toast.success('🎉 Premium activated! Enjoy your free month.');
+      toast.success('Premium activated — your free month starts now.');
       onRedeemed(); // refresh parent state
     } catch (err) {
       toast.error(getApiError(err, 'Could not redeem code. Please try again.'));
@@ -126,7 +126,7 @@ function CodeRedeemBox({ onRedeemed }: { onRedeemed: () => void }) {
             <div>
               <div className="font-mono text-sm font-bold tracking-widest text-text mb-1">{preview.code}</div>
               <div className="text-sm text-primary font-medium mb-1">
-                {isFree ? '🎁 1 Month FREE — Premium on us' : `💸 ${preview.discountPct}% off your first 6 months`}
+                {isFree ? 'One month free — Premium on us' : `${preview.discountPct}% off your first 6 months`}
               </div>
               <div className="text-xs text-muted">
                 Expires {new Date(preview.expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -160,8 +160,8 @@ function CodeRedeemBox({ onRedeemed }: { onRedeemed: () => void }) {
           {/* Explanation */}
           <p className="text-xs text-muted mt-3 pt-3 border-t border-white/10">
             {isFree
-              ? '✅ This code gives you 1 month of Premium for free — no payment needed. Click Activate and it starts immediately.'
-              : '💳 This discount code gives you 50% off for 6 months. It gets applied automatically at checkout on the payment page.'}
+              ? 'This code gives you one month of Premium free — no payment needed. Activate it and your access starts immediately.'
+              : 'This code gives you 50% off for 6 months. It is applied automatically at checkout on the payment page.'}
           </p>
         </div>
       )}
@@ -216,8 +216,8 @@ function BillingContent() {
 
   const labelFor = (c: DiscountCode) =>
     c.discount_type === 'first_month_free'
-      ? '🎁 1 month FREE — Premium on us'
-      : `💸 ${c.discount_pct}% off your first 6 months`;
+      ? 'One month free — Premium on us'
+      : `${c.discount_pct}% off your first 6 months`;
 
   return (
     <div className="space-y-6 max-w-4xl">

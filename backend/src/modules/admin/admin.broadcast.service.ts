@@ -309,9 +309,18 @@ export class AdminBroadcastService {
   }
 
   // ── Recipient count estimate for a segment ───────────────────
+  /**
+   * Counts the segment without materialising it.
+   *
+   * This used to call getRecipients() and read `.length` — transferring the
+   * id and email of every matching user across the network so the admin UI
+   * could display one integer, on a screen where changing the segment
+   * dropdown re-runs it.
+   */
   async estimateRecipients(segment: BroadcastSegment): Promise<{ count: number; segment: string }> {
-    const recipients = await this.getRecipients(segment);
-    return { count: recipients.length, segment };
+    const { count, error } = await this.segmentQuery(segment, { countOnly: true });
+    if (error) throw error;
+    return { count: count ?? 0, segment };
   }
 
   // ── Broadcast stats summary ───────────────────────────────────
@@ -334,7 +343,12 @@ export class AdminBroadcastService {
         .limit(5),
     ]);
 
-    // Total emails ever sent
+    // Total emails ever sent.
+    //
+    // Bounded by the number of sent campaigns, which is small and grows only
+    // when an admin runs one — unlike the per-user tables, this does not need
+    // an aggregate function. It stays a separate query because the count above
+    // uses head: true and so returns no rows to sum.
     const { data: sentSum } = await supabaseAdmin
       .from('admin_broadcasts')
       .select('sent_count')
@@ -345,11 +359,21 @@ export class AdminBroadcastService {
     return { total: total ?? 0, sent: sent ?? 0, draft: draft ?? 0, scheduled: scheduled ?? 0, totalEmailsSent, recentCampaigns: recent ?? [] };
   }
 
-  // ── Private: fetch users for a segment ───────────────────────
-  private async getRecipients(segment: BroadcastSegment): Promise<{ id: string; email: string }[]> {
+  // ── Private: build the segment filter ────────────────────────
+  /**
+   * One definition of "who is in this segment", used by both the send path
+   * and the count path.
+   *
+   * They were separate before only because counting went through
+   * getRecipients(); keeping the predicate in a single place is what stops
+   * the estimate shown in the UI from drifting away from the set that
+   * actually receives the email.
+   */
+  private segmentQuery(segment: BroadcastSegment, opts: { countOnly: boolean }) {
     let query = supabaseAdmin
       .from('users')
-      .select('id, email')
+      .select(opts.countOnly ? 'id' : 'id, email',
+              opts.countOnly ? { count: 'exact', head: true } : undefined)
       .eq('is_verified', true)
       .eq('status', 'active')
       .not('email', 'is', null);
@@ -381,9 +405,14 @@ export class AdminBroadcastService {
       }
     }
 
-    const { data, error } = await query;
+    return query;
+  }
+
+  // ── Private: fetch users for a segment ───────────────────────
+  private async getRecipients(segment: BroadcastSegment): Promise<{ id: string; email: string }[]> {
+    const { data, error } = await this.segmentQuery(segment, { countOnly: false });
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []) as unknown as { id: string; email: string }[];
   }
 
   // ── Private: require broadcast exists and admin owns it ───────

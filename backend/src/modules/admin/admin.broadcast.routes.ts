@@ -121,7 +121,7 @@ Create an email broadcast to send to a user segment. Starts as a **draft** — n
         type: 'object',
         required: ['subject', 'bodyHtml', 'segment'],
         properties: {
-          subject:       { type: 'string', minLength: 2, maxLength: 200, example: '🚀 New feature: AI video editing is here!' },
+          subject:       { type: 'string', minLength: 2, maxLength: 200, example: 'New feature: AI video editing is here' },
           bodyHtml:      { type: 'string', description: 'Full HTML email body (dark theme recommended)' },
           previewText:   { type: 'string', maxLength: 200, description: 'Preview text shown in email client inbox below subject', example: 'Edit your stream recordings with a single text prompt.' },
           internalNotes: { type: 'string', description: 'Admin-only notes — not visible to users', example: 'Part of Q2 feature launch campaign' },

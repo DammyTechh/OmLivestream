@@ -8,7 +8,7 @@ type MaybeQueue = Queue | { add: (...args: unknown[]) => Promise<null>; getJob: 
 function makeQueue(name: string): MaybeQueue {
   if (!BULLMQ_ENABLED) {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`⚠️  BullMQ queue '${name}' disabled (UPSTASH_REDIS_URL not set — local dev)`);
+      console.warn(`BullMQ queue '${name}' disabled — UPSTASH_REDIS_URL not set (local dev)`);
     }
     // No-op stub — .add() silently returns null, no errors
     return {

@@ -61,7 +61,7 @@ function CallbackContent() {
         {state === 'active' && (
           <>
             <CheckCircle2 className="mx-auto mb-4 text-emerald-500" size={48} />
-            <h1 className="text-xl font-bold mb-2">You&apos;re on Premium 🎉</h1>
+            <h1 className="text-xl font-bold mb-2">You&apos;re on Premium</h1>
             <p className="text-muted text-sm mb-6">
               Your subscription is active. Every platform is unlocked.
             </p>

@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../../config/supabase';
 import { encrypt, decrypt } from '../../utils/crypto';
 import { env } from '../../config/env';
 import { NotFoundError, ValidationError, AppError } from '../../utils/errors';
+import { logger } from '../../config/logger';
 import type { Platform } from '../../types/database';
 
 const OAUTH: Record<string, { authUrl: string; tokenUrl: string; clientId: string; clientSecret: string; redirectUri: string; scopes: string[] }> = {
@@ -64,6 +65,105 @@ export class PlatformsService {
 
   async disconnect(userId: string, id: string): Promise<void> {
     await supabaseAdmin.from('platform_connections').delete().eq('id', id).eq('user_id', userId);
+  }
+
+  /**
+   * Opens a fresh live session on a platform for one specific broadcast.
+   *
+   * This is deliberately separate from getStreamCredentials(). The RTMP
+   * endpoint and key can be long-lived, but the *live session* — YouTube's
+   * liveBroadcast, Facebook's live video — cannot: each is single-use, and
+   * each carries the chat handle we need in order to read comments.
+   * Creating them at OAuth-connect time (as fetchStreamDetails does) yields
+   * an object that is already dead by the time the user actually streams.
+   *
+   * Returns null when the platform has no such concept, or when the call
+   * fails — a platform that cannot open a chat session should still receive
+   * video, so callers treat this as best-effort.
+   */
+  async openLiveSession(userId: string, platform: Platform, title: string): Promise<{
+    liveChatId?:  string;
+    liveVideoId?: string;
+    rtmpUrl?:     string;
+    streamKey?:   string;
+  } | null> {
+    const { data } = await supabaseAdmin.from('platform_connections')
+      .select('access_token_encrypted,status').eq('user_id', userId).eq('platform', platform).single();
+    if (!data?.access_token_encrypted || data.status !== 'connected') return null;
+
+    let token: string;
+    try { token = decrypt(data.access_token_encrypted); }
+    catch (err) { logger.error({ err, platform }, 'Could not decrypt token for live session'); return null; }
+
+    try {
+      if (platform === 'youtube') return await this.openYouTubeSession(token, title);
+      if (platform === 'facebook') return await this.openFacebookSession(token, title);
+    } catch (err) {
+      logger.warn(
+        { err: (err as { response?: { data?: unknown } })?.response?.data ?? err, platform },
+        'Could not open live session — streaming video only, no comment feed'
+      );
+    }
+    return null;
+  }
+
+  /**
+   * YouTube needs three calls, not one.
+   *
+   * A liveStream is only an ingestion endpoint — it has no chat and is not
+   * publicly visible. What viewers watch, and what owns the live chat, is a
+   * liveBroadcast. The two are separate objects and must be explicitly
+   * bound. Creating just the liveStream (which is all fetchStreamDetails
+   * did) produces a key that accepts video nobody can see.
+   */
+  private async openYouTubeSession(token: string, title: string) {
+    const auth = { headers: { Authorization: `Bearer ${token}` } };
+
+    const broadcast = await axios.post(
+      'https://www.googleapis.com/youtube/v3/liveBroadcasts',
+      {
+        snippet: { title, scheduledStartTime: new Date().toISOString() },
+        status:  { privacyStatus: 'public', selfDeclaredMadeForKids: false },
+        // Without autoStart the broadcast sits in 'ready' until it is
+        // transitioned manually, so the ingested video never goes live.
+        contentDetails: { enableAutoStart: true, enableAutoStop: true },
+      },
+      { ...auth, params: { part: 'snippet,status,contentDetails' } }
+    );
+
+    const stream = await axios.post(
+      'https://www.googleapis.com/youtube/v3/liveStreams',
+      { snippet: { title }, cdn: { frameRate: 'variable', ingestionType: 'rtmp', resolution: 'variable' } },
+      { ...auth, params: { part: 'snippet,cdn' } }
+    );
+
+    await axios.post(
+      'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind',
+      null,
+      { ...auth, params: { id: broadcast.data.id, streamId: stream.data.id, part: 'id,contentDetails' } }
+    );
+
+    return {
+      liveChatId: broadcast.data?.snippet?.liveChatId as string | undefined,
+      rtmpUrl:    RTMP_ENDPOINTS.youtube!,
+      streamKey:  stream.data?.cdn?.ingestionInfo?.streamName as string | undefined,
+    };
+  }
+
+  private async openFacebookSession(token: string, title: string) {
+    const r = await axios.post(
+      'https://graph.facebook.com/v19.0/me/live_videos',
+      { status: 'LIVE_NOW', title },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const url: string = r.data?.stream_url ?? '';
+    const parts = url.split('/');
+    const key = parts.pop();
+    return {
+      liveVideoId: r.data?.id as string | undefined,
+      rtmpUrl:     parts.join('/') || RTMP_ENDPOINTS.facebook!,
+      streamKey:   key || undefined,
+    };
   }
 
   async reconnect(userId: string, id: string): Promise<void> {

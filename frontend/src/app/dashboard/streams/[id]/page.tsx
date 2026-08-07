@@ -40,7 +40,9 @@ interface Comment {
   platform: string;
   author: string;
   text: string;
-  at: string;
+  timestamp: string;
+  /** The platform's own comment id — used as the reply target. */
+  platformCommentId: string;
 }
 
 interface PlatformMetrics {
@@ -141,7 +143,7 @@ export default function StreamDetailPage() {
     try {
       await api.post(`/streams/${id}/comments/reply`, {
         platform:   replyFor.platform,
-        comment_id: replyFor.id,
+        commentId:  replyFor.platformCommentId,
         text:       replyText,
       });
       toast.success(`Reply sent to ${replyFor.platform}`);
