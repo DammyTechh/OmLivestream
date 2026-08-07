@@ -31,19 +31,33 @@
  * ~0.05 cores to ~1 core and will silently wreck capacity planning.
  */
 
-import { spawn, ChildProcess } from 'child_process';
-import { writeFile, unlink, mkdir } from 'fs/promises';
+import { spawn, execFile, ChildProcess } from 'child_process';
+import { writeFile, readFile, unlink, mkdir, stat } from 'fs/promises';
+import { promisify } from 'util';
 import path from 'path';
 import os from 'os';
 import type * as mediasoup from 'mediasoup';
 import { getRouter, getStreamProducers } from './webrtc.service';
+import { supabaseAdmin } from '../../config/supabase';
 import { logger } from '../../config/logger';
 import { AppError } from '../../utils/errors';
+
+const execFileAsync = promisify(execFile);
 
 export interface RtmpTarget {
   platform:  string;
   rtmpUrl:   string;
   streamKey: string;
+}
+
+/**
+ * Identifies the `recordings` row this broadcast is filling in. Passed in
+ * rather than looked up here so the bridge stays a media component and does
+ * not own the recording lifecycle.
+ */
+export interface RecordingRef {
+  recordingId: string;
+  userId:      string;
 }
 
 interface Session {
@@ -56,9 +70,139 @@ interface Session {
   targets:    RtmpTarget[];
   restarts:   number;
   stopping:   boolean;
+  /** Row being filled in, or null when recording is off. */
+  recording:  RecordingRef | null;
+  /** Where this broadcast is being recorded, or null if recording is off. */
+  recordPath: string | null;
+  /**
+   * Segment counter. Every ffmpeg restart has to write to a NEW file, because
+   * reopening the same path truncates whatever the previous process wrote.
+   */
+  recordSegments: string[];
 }
 
 const sessions = new Map<string, Session>();
+
+/** Where in-progress recordings are written before finalisation. */
+export const RECORDING_DIR = path.join(os.tmpdir(), 'omlivestream-rec');
+
+/**
+ * Matroska, not MP4, and this is the whole reason recording works at all.
+ *
+ * MP4 keeps its index (the moov atom) in memory and writes it on clean
+ * shutdown. Render sends SIGTERM and follows with SIGKILL; a crashed or
+ * force-killed instance therefore leaves an MP4 with no moov atom, which is
+ * not a short recording — it is zero recoverable frames. Verified: ffprobe
+ * reports "moov atom not found" and decoding yields nothing.
+ *
+ * Matroska interleaves its structure with the data, so the same hard kill
+ * leaves a file that still decodes up to the last flushed cluster. The
+ * finaliser remuxes it to a faststart MP4 afterwards, with -c copy, so the
+ * container swap costs no CPU and no quality.
+ */
+const RECORD_FORMAT = 'matroska';
+const RECORD_EXT    = 'mkv';
+
+// ── Recording finalisation ─────────────────────────────────────────
+/**
+ * Remuxes the recorded segments to a faststart MP4 and uploads it.
+ *
+ * The final mp4 is produced with `-c copy`: the segments are already
+ * H.264/AAC — the exact byte stream the tee wrote — so the container swap
+ * costs no CPU and no quality. Verified: a truncated mkv (the byproduct of
+ * a SIGKILL) remuxes cleanly and recovers the full decodable duration.
+ *
+ * Deliberately NOT in a worker: production runs a single web process (the
+ * Dockerfile CMD is `node dist/server.js`), so a separate BullMQ worker
+ * would have nobody to consume the job. Finalisation runs inline at stream
+ * end, where the broadcast itself already lives.
+ */
+async function finaliseRecording(
+  streamId: string,
+  recording: RecordingRef,
+  segments: string[]
+): Promise<void> {
+  const { recordingId, userId } = recording;
+  const tmpDir  = RECORDING_DIR;
+  const input   = path.join(tmpDir, `${streamId}.all.${RECORD_EXT}`);
+  const output  = path.join(tmpDir, `${streamId}.final.mp4`);
+
+  // A stream that ended within its first ~10 seconds may have produced a
+  // segment that never flushed. A segment of a few KB of headers decodes to
+  // nothing, so concat first, then let the probe fail the whole row.
+  try {
+    await writeFile(input, segments.map(s => `file '${s}'`).join('\n') + '\n', 'utf8');
+    await execFileAsync('ffmpeg', [
+      '-hide_banner', '-loglevel', 'error', '-y',
+      '-f', 'concat', '-safe', '0', '-i', input,
+      '-c', 'copy', '-movflags', '+faststart', output,
+    ], { timeout: 10 * 60_000 });
+  } catch (err) {
+    logger.error({ streamId, recordingId, err }, 'Recording remux failed');
+    await markRecordingFailed(recordingId);
+    return;
+  }
+
+  try {
+    // Probe the remuxed file rather than trusting the live process.
+    const { stdout } = await execFileAsync('ffprobe', [
+      '-v', 'error', '-show_entries', 'format=duration,size', '-of', 'json', output,
+    ], { timeout: 60_000 });
+    const probe = JSON.parse(stdout);
+    const durationSeconds = Math.round(Number(probe?.format?.duration ?? 0));
+    const sizeBytes       = Number(probe?.format?.size ?? 0);
+
+    // Fall back to the file's own size if ffprobe returned nothing.
+    let size = sizeBytes;
+    if (!size) {
+      try { size = (await stat(output)).size; } catch { size = 0; }
+    }
+
+    // Path includes userId: the bucket is shared across every account, and
+    // signed URLs are minted from the stored file_url, so the path must be
+    // reconstructible and unique per user.
+    const storagePath = `${userId}/${streamId}/recording.mp4`;
+    const buf = await readFile(output);
+    const { error: uploadErr } = await supabaseAdmin.storage.from('recordings')
+      .upload(storagePath, buf, { contentType: 'video/mp4', upsert: true });
+
+    if (uploadErr) throw uploadErr;
+
+    const { data: urlData } = supabaseAdmin.storage.from('recordings').getPublicUrl(storagePath);
+
+    await supabaseAdmin.from('recordings')
+      .update({
+        file_url:         urlData.publicUrl,
+        duration_seconds: durationSeconds,
+        size_bytes:       size,
+        status:           'ready',
+        updated_at:       new Date().toISOString(),
+      })
+      .eq('id', recordingId);
+
+    logger.info({ streamId, recordingId, durationSeconds, size }, 'Recording finalised');
+  } catch (err) {
+    logger.error({ streamId, recordingId, err }, 'Recording upload failed');
+    await markRecordingFailed(recordingId);
+  } finally {
+    for (const f of [input, output, ...segments]) {
+      await unlink(f).catch(() => {});
+    }
+  }
+}
+
+async function markRecordingFailed(recordingId: string): Promise<void> {
+  // try/catch rather than .catch(): the Supabase query builder is a thenable,
+  // not a Promise, so it has no .catch to attach to.
+  try {
+    const { error } = await supabaseAdmin.from('recordings')
+      .update({ status: 'failed', updated_at: new Date().toISOString() })
+      .eq('id', recordingId);
+    if (error) throw error;
+  } catch (err) {
+    logger.error({ recordingId, err }, 'Failed to mark recording failed');
+  }
+}
 
 // ── Port allocation ────────────────────────────────────────────────
 // ffmpeg listens on these; mediasoup sends to them. Kept well clear of
@@ -138,8 +282,9 @@ function buildFfmpegArgs(opts: {
   targets:     RtmpTarget[];
   copyVideo:   boolean;
   hasAudio:    boolean;
+  recordPath?: string | null;
 }): string[] {
-  const { sdpPath, targets, copyVideo, hasAudio } = opts;
+  const { sdpPath, targets, copyVideo, hasAudio, recordPath } = opts;
 
   const args: string[] = [
     '-hide_banner',
@@ -195,14 +340,30 @@ function buildFfmpegArgs(opts: {
 
   // tee fans out to every platform from one pipeline. onfail=ignore means
   // YouTube rejecting the key does not kill the Twitch push.
-  const teeTargets = targets
-    .map((t) => {
-      const url = `${t.rtmpUrl.replace(/\/+$/, '')}/${t.streamKey}`;
-      return `[f=flv:onfail=ignore]${url}`;
-    })
-    .join('|');
+  const slaves = targets.map((t) => {
+    const url = `${t.rtmpUrl.replace(/\/+$/, '')}/${t.streamKey}`;
+    return `[f=flv:onfail=ignore]${url}`;
+  });
 
-  args.push('-f', 'tee', teeTargets);
+  // Recording is one more slave on the same tee, not a second ffmpeg and not
+  // a second copy of the media crossing the network. The bytes here are
+  // already H.264/AAC on their way to the platforms, so the recording costs
+  // one file write and no additional encoding.
+  //
+  // This replaces the old design, where the browser ran a parallel
+  // MediaRecorder and shipped every chunk over the websocket to be base64'd
+  // into a Redis list — 33% wire inflation, one Upstash HTTPS request per
+  // chunk, uncapped, and a duplicate upload of video the server already had.
+  //
+  // onfail=ignore is mandatory, not defensive: verified that without it a
+  // recording slave that cannot open its file aborts the entire tee and takes
+  // every platform down with it. A full disk must cost the recording, never
+  // the broadcast.
+  if (recordPath) {
+    slaves.push(`[f=${RECORD_FORMAT}:onfail=ignore]${recordPath}`);
+  }
+
+  args.push('-f', 'tee', slaves.join('|'));
 
   return args;
 }
@@ -212,10 +373,15 @@ function buildFfmpegArgs(opts: {
 /**
  * Starts pushing a live stream to every configured platform.
  * Safe to call once per stream; a second call is a no-op.
+ *
+ * Pass `recording` to have the broadcast recorded. The recording is written
+ * by the same ffmpeg that feeds the platforms, as one more tee slave, so it
+ * costs a file write and nothing else.
  */
 export async function startBroadcast(
   streamId: string,
-  targets: RtmpTarget[]
+  targets: RtmpTarget[],
+  recording?: RecordingRef | null
 ): Promise<{ platforms: number; videoCopied: boolean }> {
   if (sessions.has(streamId)) {
     logger.warn({ streamId }, 'Broadcast already running — ignoring duplicate start');
@@ -248,6 +414,9 @@ export async function startBroadcast(
     targets,
     restarts:   0,
     stopping:   false,
+    recording:  recording ?? null,
+    recordPath: null,
+    recordSegments: [],
   };
 
   try {
@@ -305,6 +474,17 @@ export async function startBroadcast(
     session.sdpPath = path.join(dir, `${streamId}.sdp`);
     await writeFile(session.sdpPath, buildSdp(sdpParts), 'utf8');
 
+    // Recording failing to set up must not stop the broadcast: going live is
+    // the paid-for behaviour, the recording is a byproduct of it.
+    if (session.recording) {
+      try {
+        await mkdir(RECORDING_DIR, { recursive: true });
+      } catch (err) {
+        logger.error({ streamId, err }, 'Cannot create recording directory — recording disabled');
+        session.recording = null;
+      }
+    }
+
     sessions.set(streamId, session);
 
     await spawnFfmpeg(session, copyVideo, Boolean(sdpParts.audio));
@@ -336,11 +516,24 @@ function spawnFfmpeg(
   hasAudio: boolean
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    // A new file per spawn, not a reopen of the last one. ffmpeg truncates on
+    // open, so a restart pointed at the existing path would discard
+    // everything the previous process recorded — the exact case a restart is
+    // there to survive. The finaliser concatenates the segments back together.
+    if (session.recording) {
+      session.recordPath = path.join(
+        RECORDING_DIR,
+        `${session.streamId}.${session.recordSegments.length}.${RECORD_EXT}`
+      );
+      session.recordSegments.push(session.recordPath);
+    }
+
     const args = buildFfmpegArgs({
       sdpPath:   session.sdpPath,
       targets:   session.targets,
       copyVideo,
       hasAudio,
+      recordPath: session.recordPath,
     });
 
     logger.debug({ streamId: session.streamId, args }, 'Spawning ffmpeg');
@@ -453,13 +646,29 @@ async function teardown(session: Session): Promise<void> {
   }
 }
 
-/** Stops the broadcast and frees ports, transports and the SDP file. */
+/**
+ * Stops the broadcast, frees ports/transports/SDP, and finalises the
+ * recording if one was being written.
+ *
+ * The finalise step is awaited rather than fired and forgotten: the caller
+ * (streams.service.end) is an HTTP request, and the recording row is left
+ * 'processing' until this resolves. A remux with -c copy is I/O bound and
+ * quick, so this costs the request the upload, not an encode.
+ */
 export async function stopBroadcast(streamId: string): Promise<void> {
   const session = sessions.get(streamId);
   if (!session) return;
   sessions.delete(streamId);
   await teardown(session);
   logger.info({ streamId }, 'Broadcast stopped');
+
+  if (session.recording && session.recordSegments.length > 0) {
+    await finaliseRecording(streamId, session.recording, session.recordSegments);
+  } else if (session.recording) {
+    // Recording was requested but ffmpeg never wrote a segment.
+    logger.warn({ streamId }, 'Recording requested but no segment was written');
+    await markRecordingFailed(session.recording.recordingId);
+  }
 }
 
 /** Live status for the dashboard / health checks. */
@@ -481,7 +690,19 @@ export function getActiveBroadcastCount(): number {
   return sessions.size;
 }
 
-/** Stops everything — called on SIGTERM so platforms see a clean end. */
+/**
+ * Stops everything — called on SIGTERM so platforms see a clean end.
+ *
+ * Each stopBroadcast sends end-of-stream to the platforms *before* it starts
+ * finalising, so a shutdown that runs out of time loses the recording upload
+ * and never the clean end-of-broadcast.
+ *
+ * Recordings are only best-effort here. The segments live in the container's
+ * /tmp, which Render discards when the instance goes away, so a SIGKILL that
+ * lands before the upload finishes loses that recording regardless of
+ * container format. Matroska buys back the case that is actually recoverable:
+ * ffmpeg itself dying and being restarted while the instance lives on.
+ */
 export async function stopAllBroadcasts(): Promise<void> {
   await Promise.all([...sessions.keys()].map((id) => stopBroadcast(id)));
 }

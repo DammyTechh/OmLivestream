@@ -307,12 +307,19 @@ export function initSocketIO(httpServer: http.Server): IO {
       void redis.set(REDIS_KEYS.STREAM_BITRATE(data.streamId), kbps, { ex: 60 });
     });
 
-    // ── recording:chunk ───────────────────────────────────────────
-    // Receives binary recording chunks from the browser MediaRecorder
-    socket.on('recording:chunk', async (data: { streamId: string; chunk: Buffer; index: number }) => {
-      // Store chunk in Redis list temporarily; finalised by BullMQ worker when stream ends
-      await redis.rpush(`recording:chunks:${data.streamId}`, data.chunk.toString('base64'));
-    });
+    // There is deliberately no recording:chunk handler.
+    //
+    // Recording is produced server-side by the ffmpeg that already feeds the
+    // platforms — see broadcast.service, where it is one more slave on the
+    // same tee. The browser does not upload anything.
+    //
+    // What used to be here: the client ran a parallel MediaRecorder and sent
+    // every chunk over this socket to be base64'd into a Redis list. That
+    // inflated the payload 33%, made one Upstash HTTPS request per chunk with
+    // no cap, and re-uploaded video the server was already holding. Nothing
+    // ever read the list back, and the "finalised by a BullMQ worker" it
+    // referred to does not exist in production — the Dockerfile CMD starts
+    // the web process only. So it burned bandwidth and produced no recording.
 
     // ── disconnect ─────────────────────────────────────────────────
     socket.on('disconnect', async (reason) => {

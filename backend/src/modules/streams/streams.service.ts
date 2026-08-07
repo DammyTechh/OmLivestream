@@ -163,6 +163,21 @@ export class StreamsService {
     type Target = { platform: string; rtmpUrl: string; streamKey: string };
     type Ref    = { platform: string; liveChatId?: string; liveVideoId?: string };
 
+    // The recording row was created by start(). Finding it here is what
+    // connects it to the ffmpeg that is about to run: the bridge writes the
+    // file and fills this row in on stopBroadcast.
+    //
+    // Recording is not plan-gated — every plan records, they differ only in
+    // how long the file is retained (PLAN_LIMITS.recordingDays).
+    const { data: recRow } = await supabaseAdmin
+      .from('recordings').select('id')
+      .eq('stream_id', streamId).eq('status', 'processing')
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+
+    if (!recRow) {
+      logger.warn({ streamId }, 'No processing recording row — broadcast will not be recorded');
+    }
+
     // Prepare every platform concurrently.
     //
     // openLiveSession is an outbound call to YouTube or Facebook that can
@@ -230,7 +245,11 @@ export class StreamsService {
       );
     }
 
-    const result = await startBroadcast(streamId, targets);
+    const result = await startBroadcast(
+      streamId,
+      targets,
+      recRow ? { recordingId: recRow.id, userId } : null
+    );
 
     await supabaseAdmin.from('stream_platforms')
       .update({ rtmp_push_status: 'active' })
@@ -321,6 +340,19 @@ export class StreamsService {
       supabaseAdmin.from('streams').update({ status: 'ended', ended_at: endedAt }).eq('id', streamId),
       supabaseAdmin.from('stream_platforms').update({ rtmp_push_status: 'ended' }).eq('stream_id', streamId),
       supabaseAdmin.from('users').update({ last_stream_ended_at: endedAt }).eq('id', userId),
+
+      // Close out a recording that was never written. start() inserts the row
+      // on 'processing', but a user who starts a stream and ends it without
+      // ever going live produces no file, and the row would otherwise sit on
+      // 'processing' forever — a recording that appears to be encoding and
+      // never arrives.
+      //
+      // Safe to run unconditionally: stopBroadcast above is awaited and has
+      // already moved a real recording to 'ready' or 'failed', so the
+      // status filter only ever matches the orphan case.
+      supabaseAdmin.from('recordings')
+        .update({ status: 'failed', updated_at: endedAt })
+        .eq('stream_id', streamId).eq('status', 'processing'),
       // The liveness cache would otherwise keep reporting this stream live
       // for up to its TTL, letting viewers join a room nothing emits into.
       redis.del(REDIS_KEYS.STREAM_LIVE(streamId)),

@@ -326,7 +326,11 @@ Dashboard → Storage → New bucket:
 | `leave:stream` | `streamId` | Leave stream room |
 | `comment:reply` | `{ streamId, platformCommentId, platform, replyText }` | Reply to comment (Premium only) |
 | `stream:health:ping` | `{ streamId, bitrateKbps }` | Send every 2s — server returns quality status |
-| `recording:chunk` | `{ streamId, chunk, index }` | Binary recording chunks from MediaRecorder |
+
+Recording needs no client event. The server-side ffmpeg that pushes to the
+platforms writes the recording itself, as one more output on the same tee, so
+the browser never uploads video. A `recording:chunk` event was documented here
+previously; it was removed along with its handler.
 
 ### Server → Client
 | Event | Payload | Description |
