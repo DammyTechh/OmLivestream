@@ -11,12 +11,16 @@ export function Logo({
   size?: 'sm' | 'md' | 'lg';
   href?: string | null;
 }) {
-  const dims  = { sm: { w: 110, h: 24 }, md: { w: 150, h: 32 }, lg: { w: 200, h: 44 } };
-  const { w, h } = dims[size];
+  // Heights, not widths: the lockup is a fixed 366x71 of ink (trimmed to the
+  // glyphs in public/logo.webp), so pinning the height is what keeps it
+  // optically consistent with the text next to it at every size.
+  const dims = { sm: { h: 24 }, md: { h: 32 }, lg: { h: 44 } };
+  const { h } = dims[size];
+  const w = Math.round(h * (366 / 71));
 
   const img = (
     <Image
-      src="https://i.imgur.com/0NFlGxJ.png"
+      src="/logo.webp"
       alt="OmliveStream"
       width={w * 2}
       height={h * 2}

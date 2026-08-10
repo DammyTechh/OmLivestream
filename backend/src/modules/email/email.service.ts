@@ -5,7 +5,12 @@ import { logger } from '../../config/logger';
 const resend = new Resend(env.RESEND_API_KEY);
 
 // ── Design tokens ─────────────────────────────────────────────────
-const logo    = 'https://i.imgur.com/0NFlGxJ.png';
+// Email clients need an absolute URL — they have no origin to resolve a
+// relative path against — so the logo is served from the marketing site,
+// which hosts it at public/logo.png. Previously an imgur hot-link, which
+// meant every transactional email we sent depended on a third-party image
+// host staying up and not rate-limiting us.
+const logo    = `${urls.site.replace(/\/+$/, '')}/logo.png`;
 const bg      = '#07050F';
 const surface = '#0F0C1E';
 const text    = '#F8F5FF';
@@ -20,8 +25,11 @@ const wrap = (body: string) => `<!DOCTYPE html><html><head>
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0" style="background:${surface};border-radius:16px;border:1px solid rgba(124,58,237,0.2);overflow:hidden;max-width:560px;width:100%;">
 <tr><td style="background:linear-gradient(135deg,#7C3AED,#A855F7);padding:28px 40px;text-align:center;">
-  <img src="${logo}" alt="OmliveStream" style="height:44px;display:block;margin:0 auto 10px;">
-  <span style="color:${text};font-size:20px;font-weight:800;letter-spacing:-0.02em;">OmliveStream</span>
+  <!-- The logo is a lockup: mark + "OmliveStream" wordmark. The text below
+       it used to be a second wordmark, which read as a doubled brand once
+       the real asset went in. It stays as alt text only, so clients that
+       block images still show the name. -->
+  <img src="${logo}" alt="OmliveStream" style="height:40px;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
 </td></tr>
 ${body}
 <tr><td style="padding:20px 40px;border-top:1px solid rgba(124,58,237,0.15);text-align:center;">

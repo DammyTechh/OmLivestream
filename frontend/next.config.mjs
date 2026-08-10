@@ -2,9 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
+    // Brand art is self-hosted from public/ — imgur was removed along with
+    // the hot-linked logo and illustrations it used to serve.
     remotePatterns: [
-      { protocol: 'https', hostname: 'i.imgur.com' },
-      { protocol: 'https', hostname: 'imgur.com' },
       // Supabase storage (avatars, thumbnails)
       { protocol: 'https', hostname: '*.supabase.co' },
       { protocol: 'https', hostname: '*.supabase.in' },

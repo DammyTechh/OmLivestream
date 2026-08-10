@@ -1,8 +1,8 @@
 'use client';
-import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Logo } from '@/components/ui/Logo';
+import { StreamGraphic } from '@/components/ui/StreamGraphic';
 import { WavyBackground } from '@/components/ui/WavyBackground';
 
 interface AuthLayoutProps {
@@ -32,14 +32,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
                 transition={{ duration: 0.8 }}
                 className="relative w-full max-w-md"
               >
-                <Image
-                  src="https://i.imgur.com/jXUmDAo.png"
-                  alt="Multi-platform streaming"
-                  width={600}
-                  height={600}
-                  className="w-full h-auto drop-shadow-[0_0_60px_rgba(168,85,247,0.5)]"
-                  priority
-                />
+                <StreamGraphic />
               </motion.div>
             </div>
 

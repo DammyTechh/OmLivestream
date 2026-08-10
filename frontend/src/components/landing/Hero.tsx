@@ -1,5 +1,4 @@
 'use client';
-import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Mail, LayoutDashboard, Radio } from 'lucide-react';
@@ -7,10 +6,9 @@ import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { WavyBackground } from '@/components/ui/WavyBackground';
 import { SocialButtons } from '@/components/auth/SocialButtons';
+import { StreamGraphic } from '@/components/ui/StreamGraphic';
 import { YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon } from '@/components/ui/BrandIcons';
 import { TOKEN_KEYS } from '@/lib/api';
-
-const FIGMA_ILLUSTRATION = 'https://i.imgur.com/jXUmDAo.png';
 
 const PLATFORMS = [
   { name: 'YouTube',   Icon: YouTubeIcon   },
@@ -58,14 +56,7 @@ export function Hero() {
             className="relative order-2 lg:order-1"
           >
             <div className="relative max-w-lg mx-auto">
-              <Image
-                src={FIGMA_ILLUSTRATION}
-                alt="Multi-platform streaming"
-                width={600}
-                height={600}
-                className="w-full h-auto drop-shadow-2xl"
-                priority
-              />
+              <StreamGraphic />
             </div>
           </motion.div>
 

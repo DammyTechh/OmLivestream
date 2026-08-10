@@ -1,6 +1,6 @@
 # OmliveStream Backend — Complete Setup & Config Guide
 
-> **Product:** OmliveStream &nbsp;|&nbsp; **Logo:** https://i.imgur.com/0NFlGxJ.png  
+> **Product:** OmliveStream &nbsp;|&nbsp; **Logo:** `frontend/public/logo.webp` (source: `assets/omlive logo.webp`)  
 > **Stack:** Node.js + Fastify + TypeScript + mediasoup + Go + Supabase + Redis + Resend + Paystack
 
 ---
