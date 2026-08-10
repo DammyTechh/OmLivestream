@@ -9,6 +9,7 @@ export function Footer() {
           <Logo size="sm" />
           <p className="text-muted text-xs">© {new Date().getFullYear()} OmliveStream. All rights reserved</p>
           <div className="flex gap-7 text-xs">
+            <Link href="/about" className="text-muted hover:text-text transition">About</Link>
             <Link href="/privacy" className="text-muted hover:text-text transition">Privacy</Link>
             <Link href="/terms"   className="text-muted hover:text-text transition">Terms</Link>
             <Link href="/#contact" className="text-muted hover:text-text transition">Contact</Link>

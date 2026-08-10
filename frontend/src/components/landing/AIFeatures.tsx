@@ -125,7 +125,7 @@ export function AIFeatures() {
                   className="flex items-center gap-3 p-3 rounded-xl bg-[#1F1538]/60 border border-primary/15 text-sm"
                 >
                   <Sparkles size={14} className="text-primary shrink-0" />
-                  <span className="truncate">{t}</span>
+                  <span className="min-w-0 flex-1 truncate">{t}</span>
                 </motion.div>
               ))}
             </div>

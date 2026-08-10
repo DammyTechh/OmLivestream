@@ -4,12 +4,14 @@ import { YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon } from
 
 // ── Visual 1: Platform hub with central LIVE indicator ──
 function PlatformsVisual() {
+  // On mobile every tile is pinned to a container edge so it can never overflow
+  // or collide; from `md` up the original desktop positions are restored.
   const tiles = [
-    { name: 'YouTube',   Icon: YouTubeIcon,   viewers: '1,885', pos: 'top-4 left-4'    },
-    { name: 'TikTok',    Icon: TikTokIcon,    viewers: '3,242', pos: 'top-4 left-44'   },
-    { name: 'Instagram', Icon: InstagramIcon, viewers: '753',   pos: 'top-4 right-4'   },
-    { name: 'Facebook',  Icon: FacebookIcon,  viewers: '492',   pos: 'bottom-4 left-4' },
-    { name: 'Twitch',    Icon: TwitchIcon,    viewers: '2,067', pos: 'bottom-4 left-44' },
+    { name: 'YouTube',   Icon: YouTubeIcon,   viewers: '1,885', pos: 'top-4 left-4'                                },
+    { name: 'TikTok',    Icon: TikTokIcon,    viewers: '3,242', pos: 'top-32 left-4 md:top-4 md:left-44'          },
+    { name: 'Instagram', Icon: InstagramIcon, viewers: '753',   pos: 'top-4 right-4'                               },
+    { name: 'Facebook',  Icon: FacebookIcon,  viewers: '492',   pos: 'bottom-4 left-4'                             },
+    { name: 'Twitch',    Icon: TwitchIcon,    viewers: '2,067', pos: 'bottom-4 right-4 md:right-auto md:left-44'   },
   ];
   return (
     <div className="relative w-full h-80 rounded-3xl bg-[#14102A]/70 border border-primary/20 p-5 overflow-hidden">
@@ -39,13 +41,22 @@ function PlatformsVisual() {
       >
         <span className="font-display font-bold text-white text-sm tracking-wider">LIVE</span>
       </motion.div>
-      {/* Connecting lines */}
+      {/* Connecting lines — mobile set matches the edge-pinned tiles */}
       <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20">
-        <line x1="20%" y1="15%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
-        <line x1="50%" y1="15%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
-        <line x1="80%" y1="15%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
-        <line x1="20%" y1="85%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
-        <line x1="50%" y1="85%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+        <g className="md:hidden">
+          <line x1="12%" y1="12%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+          <line x1="12%" y1="47%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+          <line x1="12%" y1="88%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+          <line x1="88%" y1="12%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+          <line x1="88%" y1="88%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+        </g>
+        <g className="hidden md:block">
+          <line x1="20%" y1="15%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+          <line x1="50%" y1="15%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+          <line x1="80%" y1="15%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+          <line x1="20%" y1="85%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+          <line x1="50%" y1="85%" x2="50%" y2="50%" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 3" />
+        </g>
       </svg>
     </div>
   );
