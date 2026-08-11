@@ -264,18 +264,6 @@ function PlatformsContent() {
           })}
         </div>
       )}
-
-      <Card className="p-5">
-        <h2 className="font-medium mb-2">Which method should I use?</h2>
-        <p className="text-sm text-muted">
-          Signing in is easier where it is offered: we fetch the stream key for you, and on YouTube and
-          Facebook we also open the live session that carries the chat, so comments and viewer numbers
-          appear on your stream page. A stream key is all that is needed to send video, and it is the
-          only way in for Kick — and for Instagram, TikTok, X and LinkedIn, whose live ingest is not
-          readable over their APIs. Keys are encrypted before they are stored and are never sent back
-          to your browser.
-        </p>
-      </Card>
     </div>
   );
 }

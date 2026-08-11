@@ -67,36 +67,77 @@ Don't pay for a nearer datacenter.
 
 ## Which box to buy
 
-**[Hetzner Cloud CCX13](https://www.hetzner.com/cloud/) — 2 dedicated AMD vCPU, 8 GB
-RAM, 80 GB NVMe, 20 TB traffic.** Location Falkenstein, Nuremberg or Helsinki.
+The spec to match, whoever you buy from: **2–4 vCPU, 8 GB RAM, 75 GB+ NVMe, Ubuntu
+24.04, an EU location, and the largest monthly traffic allowance you can get.** Traffic
+is the number that decides this, not CPU — see the arithmetic below.
 
-Dedicated vCPU rather than the cheaper shared CPX line for one specific reason: on a
-shared core another tenant's spike shows up as steal time, steal time shows up as
-jitter in the RTP ingest, and jitter in the ingest cannot be repaired downstream —
-it is copied to all eight platforms. It is the one place where the cheaper instance
-costs you the product.
+**[Contabo Cloud VPS 10](https://contabo.com/en/vps/) — around €5–6/month, 3 vCPU,
+8 GB RAM, NVMe, 32 TB traffic.** Location Nuremberg or Düsseldorf. Pick NVMe over the
+larger SATA SSD option: recordings are written by a second ffmpeg output while the
+broadcast runs, and that write must never contend with the live path.
 
-EU rather than US or Singapore because the 20 TB traffic allowance is EU-only;
-Hetzner's US locations include 1 TB and Singapore 0.5 TB. On a streaming workload that
-difference dwarfs the instance price.
+Signup takes a card or PayPal and does not normally put you through document identity
+verification, which is the practical reason it is first here rather than Hetzner.
+Hetzner is a better machine for the money on paper, but its automated risk check
+routinely sends new accounts to passport-and-selfie verification through a third party,
+and an account that cannot clear that is worth nothing regardless of the price.
 
-What this box holds, honestly. Traffic is the binding limit long before CPU is: 20 TB
-is about 3,300 broadcaster-hours a month at three platforms, so roughly 25 people
-streaming four hours a day, every day. Concurrency is capped lower, by the network
-interface — Hetzner Cloud publishes no per-instance bandwidth guarantee and their
-support quotes 300–500 Mbit/s in practice, which is about 25 simultaneous broadcasters
-at three platforms or 10 at eight. Whichever you hit first is your ceiling.
+Two alternates, both easy to sign up for:
+[Hostinger KVM 2](https://www.hostinger.com/vps-hosting) is 2 vCPU / 8 GB / 8 TB and
+often the cheapest headline price, but the advertised rate needs a multi-year prepay and
+renews substantially higher — compare the renewal price, not the promo.
+[OVHcloud VPS](https://www.ovhcloud.com/en/vps/) costs more per month but sells
+**genuinely unmetered traffic** at a capped port speed, which is the one property that
+stops a viral stream from producing a surprise invoice.
 
-Resize in place from the Hetzner console when you do: CCX23, then CCX33, doubling
-each time, a reboot and no reinstall. **CPU and RAM can go back down; disk cannot** —
-so grow the disk last and only when you must.
+### The dedicated-vCPU advice, corrected
 
-Move to a [dedicated root server](https://www.hetzner.com/dedicated-rootserver/) when
-peak concurrency passes roughly 25, or when monthly traffic approaches 20 TB. The
-property you are buying there is a **1 Gbit port with genuinely unmetered traffic** —
-Hetzner removed the cap on 1 Gbit dedicated servers permanently. Note their 10 Gbit
-option is *not* unmetered: it includes 20 TB and bills overage, which for sustained
-streaming is the worse deal despite the bigger number.
+An earlier draft of this document insisted on dedicated vCPU and treated shared cores as
+a false economy. That was too strong, and the reason matters.
+
+The claim was that a neighbour's CPU spike becomes steal time, steal time becomes jitter
+in the RTP ingest, and ingest jitter is copied to all eight platforms rather than being
+repairable downstream. All of that is true. What it missed is how little CPU this
+workload actually uses on its normal path: H.264 from the browser is passed through with
+`-c:v copy` (`modules/webrtc/broadcast.service.ts:324`), so there is no video encoding
+at all. What is left is mediasoup shuffling packets and a single audio transcode to AAC,
+because Opus cannot be carried in FLV (`:345`). A shared core has ample headroom for
+that.
+
+The exception is the VP8 fallback at `:328-340`, which runs `libx264 -preset veryfast`
+and is logged as roughly 20x the CPU (`:479-480`). That is the case where a noisy
+neighbour would genuinely hurt. So the rule is: start shared, and watch steal time.
+
+```bash
+# %st is the steal column. Sustained above ~5% on a box that is streaming means
+# you are sharing with someone expensive.
+top -bn1 | grep '%Cpu'
+vmstat 5 5
+```
+
+If steal time is persistently high, move up to a dedicated-core plan — Contabo's Cloud
+VDS line or Hetzner's CCX — rather than buying one pre-emptively.
+
+### What this box actually holds
+
+Traffic binds first. One 1080p broadcaster at about 4.5 Mbit/s pushed to three platforms
+is roughly 6 GB per hour of egress, so 32 TB is on the order of 5,000 broadcaster-hours
+a month — about 40 people streaming four hours a day, every day. At eight platforms it
+is 16 GB per hour and roughly 2,000 hours.
+
+Concurrency is capped separately, by port speed. At three platforms each broadcaster
+needs about 13.5 Mbit/s of upload, so a 1 Gbit/s port allows somewhere near 70 in
+theory and far fewer in practice; on a 200 Mbit/s guaranteed floor it is closer to 15.
+At eight platforms divide by roughly 2.7. Whichever of traffic or port speed you reach
+first is your real ceiling.
+
+**Check the traffic clause before you pay.** Budget hosts often advertise "unlimited"
+and then throttle hard past a fair-use figure, and a throttle is indistinguishable from
+an outage for a live stream. What you want in writing is either a large hard allowance
+or unmetered at a stated speed.
+
+Resize in place when you outgrow it. **CPU and RAM can usually go back down; disk cannot**
+— so grow the disk last and only when recordings force it.
 
 ## What one bill does and does not cover
 
@@ -104,12 +145,33 @@ Render goes away entirely. What remains is a VPS bill plus the SaaS the app depe
 on: Supabase, Upstash, Resend, OpenAI and Paystack. Those are unchanged by this move
 and most sit on free tiers at launch volume.
 
-Upstash in particular does **not** need replacing with a self-hosted Redis. The client
-is Upstash's REST client (`config/redis.ts:6`), and the facade falls back to an
-in-process store when it is unreachable, deliberately, so that a cache outage degrades
-rate limiting instead of breaking every login (`config/redis.ts:11-31`). On one host
-that fallback is functionally equivalent to Redis. Keep the free tier and spend the
-attention elsewhere.
+Upstash's **REST** side does not need replacing. The client is Upstash's REST client
+(`config/redis.ts:6`), and the facade falls back to an in-process store when it is
+unreachable, deliberately, so that a cache outage degrades rate limiting instead of
+breaking every login (`config/redis.ts:11-31`). On one host that fallback is functionally
+equivalent. Keep the free tier.
+
+The **TCP** side is a different variable and it does need attention, because it is
+currently a silent failure. `UPSTASH_REDIS_URL` — distinct from
+`UPSTASH_REDIS_REST_URL` — is optional with a default of empty string
+(`config/env.ts:47`), and `BULLMQ_ENABLED` is just `!!env.UPSTASH_REDIS_URL`
+(`config/redis.ts:253`). When it is empty, `makeQueue()` in `jobs/queues.ts` returns a
+stub whose `.add()` resolves to `null` without throwing. So the video-edit,
+video-publish and broadcast-email queues accept jobs and discard them, and nothing is
+logged. The rate limiter and the Socket.io adapter degrade on the same condition.
+
+Install Redis on the box and point that one variable at it:
+
+```bash
+UPSTASH_REDIS_URL=redis://127.0.0.1:6379
+```
+
+`tlsFor()` (`config/redis.ts:229`) returns `{}` for anything that is not `rediss://`, so
+plaintext localhost is already handled — that guard exists precisely because passing a
+`tls` option at a plaintext server fails the handshake and, since the adapter degrades
+on purpose, shows up as queues quietly not working rather than as a crash. Redis must run
+with `maxmemory-policy noeviction`; under any `allkeys` policy it can evict a job hash
+while that job is in flight. `deploy/01-provision.sh` installs and configures this.
 
 ## DNS — `api.omlivestream.com`
 
@@ -177,9 +239,12 @@ sudo ufw allow 40000:49999/udp         # mediasoup RTC — the media itself
 sudo ufw enable
 ```
 
-Hetzner also has its own Cloud Firewall in the console, applied before the instance.
-If you enable it, the same rules go there too — `ufw` being open does not prove the
-provider's edge is.
+Most hosts also have their own firewall in the control panel — Hetzner's Cloud Firewall,
+OVH's, a Contabo security group — applied at the edge before the instance. If one is
+enabled, the same rules must exist there too: `ufw` being open does not prove the
+provider's edge is. This is the single most common cause of "the browser connects but
+there is no video", because signalling over TCP 443 succeeds while the UDP media is
+dropped upstream.
 
 Deploy as a non-root user:
 

@@ -2,7 +2,8 @@
 #
 # OmliveStream — stage 1 provisioning for a fresh Ubuntu 24.04 box.
 #
-# Run as root on a brand new Hetzner CCX13 (or any Ubuntu 24.04 host):
+# Run as root on a brand new Ubuntu 24.04 host (Contabo, Hetzner, OVH, Hostinger —
+# the script is provider-neutral):
 #
 #     scp deploy/01-provision.sh root@YOUR_IP:/root/
 #     ssh root@YOUR_IP 'bash /root/01-provision.sh'
@@ -49,8 +50,10 @@ ok "${CPUS} vCPU, ${MEM_MB} MB RAM"
 (( MEM_MB >= 7000 )) || warn "under 8 GB — mediasoup plus ffmpeg will be tight"
 
 # Derive the public IPv4 from the routing table rather than an external
-# lookup service. On Hetzner Cloud the public address sits directly on the
+# lookup service. On most VPS hosts the public address sits directly on the
 # interface, so the source address for an outbound route IS the announced IP.
+# Where the host uses 1:1 NAT instead, the warning below fires and the value
+# has to be set by hand from the control panel.
 #
 # The `|| true` matters: pipefail makes this assignment inherit the failure
 # when there is no default route, and set -e would then abort with no message
@@ -120,7 +123,7 @@ ok "npm $(npm --version)"
 # ── 3. Swap ─────────────────────────────────────────────────────────────────
 step "Swap"
 
-# Hetzner images ship with none. `npm ci` plus tsc plus a possible mediasoup
+# Most cloud images ship with none. `npm ci` plus tsc plus a possible mediasoup
 # compile can spike well past steady-state usage, and an OOM kill mid-build
 # leaves a half-populated node_modules that fails confusingly afterwards.
 # Swappiness stays low so this is an overflow valve, not something the media
@@ -230,7 +233,7 @@ ufw allow 80,443/tcp       >/dev/null   # reverse proxy and certbot
 ufw allow "${RTC_MIN}:${RTC_MAX}/udp" >/dev/null
 ufw --force enable >/dev/null
 ok "inbound: 22/tcp, 80+443/tcp, ${RTC_MIN}-${RTC_MAX}/udp"
-warn "Hetzner's Cloud Firewall is separate and applied before this box — if you enabled it in the console, the same UDP range must be opened there too"
+warn "if your host has its own firewall in its control panel (Hetzner Cloud Firewall, OVH, a Contabo security group), it is applied BEFORE this box — the same UDP range must be opened there too, or ufw being open proves nothing"
 
 # ── 7. Service user and layout ──────────────────────────────────────────────
 step "Service user"
