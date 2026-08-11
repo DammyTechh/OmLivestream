@@ -26,11 +26,30 @@ export async function platformsRoutes(fastify: FastifyInstance): Promise<void> {
     const q = req.query as { code: string; state: string };
     const code  = q.code;
     const state = q.state;
+    // The browser is mid-redirect from the platform, so every outcome here
+    // has to land the user back on a page. Returning JSON — which the
+    // failure paths used to do — shows them a raw error object in the
+    // address bar with no way back.
+    const dash = `${urls.dashboard}/dashboard/platforms`;
+
     const userId = await redis.get(REDIS_KEYS.OAUTH_STATE(state));
-    if (!userId) return reply.status(400).send({ success: false, error: { code: 'INVALID_STATE', message: 'OAuth state invalid or expired' } });
+    if (!userId) return reply.redirect(`${dash}?error=expired&platform=${platform}`);
     await redis.del(REDIS_KEYS.OAUTH_STATE(state));
-    await svc.handleOAuthCallback(platform as Platform, code, userId as string);
-    reply.redirect(`${urls.dashboard}/settings/platforms?connected=${platform}`);
+
+    try {
+      await svc.handleOAuthCallback(platform as Platform, code, userId as string);
+    } catch (err) {
+      // The platform's own rejection reason is the useful part — a revoked
+      // app, a missing scope, a channel that is not live-enabled — and it is
+      // lost if this is swallowed as a generic 500.
+      req.log.warn(
+        { err: (err as { response?: { data?: unknown } })?.response?.data ?? err, platform },
+        'Platform OAuth callback failed',
+      );
+      return reply.redirect(`${dash}?error=failed&platform=${platform}`);
+    }
+
+    reply.redirect(`${dash}?connected=${platform}`);
   });
 
   // All routes below require auth

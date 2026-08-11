@@ -27,10 +27,19 @@ const RTMP_ENDPOINTS: Partial<Record<Platform, string>> = {
 export class PlatformsService {
   async listConnections(userId: string) {
     const { data, error } = await supabaseAdmin.from('platform_connections')
-      .select('id,platform,status,platform_username,rtmp_url,connected_at,updated_at')
+      .select('id,platform,status,platform_username,rtmp_url,stream_key_encrypted,connected_at,updated_at')
       .eq('user_id', userId).order('connected_at', { ascending: false });
     if (error) throw error;
-    return data ?? [];
+
+    // The key itself never leaves the server, but whether one exists has to.
+    // A connection with a token and no stream key looks connected and then
+    // fails at go-live with "missing RTMP credentials" — which is true of
+    // every platform whose key we cannot fetch over its API. The dashboard
+    // needs to be able to say so before the user tries to broadcast.
+    return (data ?? []).map(({ stream_key_encrypted, ...c }) => ({
+      ...c,
+      ready: Boolean(c.rtmp_url && stream_key_encrypted),
+    }));
   }
 
   getOAuthUrl(platform: Platform, state: string): string {
@@ -59,8 +68,41 @@ export class PlatformsService {
     await this.upsert(userId, platform, { access_token, refresh_token, ...details, status: 'connected' });
   }
 
+  /**
+   * Save an RTMP URL and stream key the user pasted in themselves.
+   *
+   * This is the only way to reach Kick, and the fallback for every platform
+   * whose key we cannot fetch over its API — TikTok, X and LinkedIn all
+   * gate live ingest behind approval that most accounts do not have.
+   *
+   * The update is deliberately partial. Going through upsert() here would
+   * write null over access_token_encrypted, so a user who connected YouTube
+   * by OAuth and then pasted a key would silently lose their token — and
+   * with it the live chat, the comment feed and the viewer counts, none of
+   * which a stream key can provide.
+   */
   async connectManual(userId: string, platform: Platform, rtmpUrl: string, streamKey: string): Promise<void> {
-    await this.upsert(userId, platform, { access_token: null, refresh_token: null, rtmpUrl, streamKey, platformUserId: null, platformUsername: null, status: 'connected' });
+    const { data: existing } = await supabaseAdmin.from('platform_connections')
+      .select('id').eq('user_id', userId).eq('platform', platform).maybeSingle();
+
+    const fields = {
+      rtmp_url:             rtmpUrl,
+      stream_key_encrypted: encrypt(streamKey),
+      status:               'connected',
+      updated_at:           new Date().toISOString(),
+    };
+
+    if (existing) {
+      await supabaseAdmin.from('platform_connections').update(fields).eq('id', existing.id);
+      return;
+    }
+
+    await supabaseAdmin.from('platform_connections').insert({
+      id: uuidv4(), user_id: userId, platform,
+      access_token_encrypted: null, refresh_token_encrypted: null,
+      platform_user_id: null, platform_username: null,
+      ...fields,
+    });
   }
 
   async disconnect(userId: string, id: string): Promise<void> {
