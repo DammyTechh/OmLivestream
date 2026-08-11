@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { Menu, X, LayoutDashboard, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TOKEN_KEYS } from '@/lib/api';
+import { resetSocket } from '@/lib/socket';
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
@@ -49,6 +50,7 @@ export function Navbar() {
     localStorage.removeItem(TOKEN_KEYS.ACCESS);
     localStorage.removeItem(TOKEN_KEYS.REFRESH);
     localStorage.removeItem(TOKEN_KEYS.USER);
+    resetSocket();
     setIsAuthed(false);
     setOpen(false);
     router.push('/');

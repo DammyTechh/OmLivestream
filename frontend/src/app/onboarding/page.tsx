@@ -11,6 +11,7 @@ import { WavyBackground } from '@/components/ui/WavyBackground';
 import { Spinner } from '@/components/ui/Spinner';
 import { api, getApiError, TOKEN_KEYS } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { EmailClaimGate } from '@/components/auth/EmailClaimGate';
 
 // Values MUST match the backend enum exactly
 const HEARD_FROM: { value: string; label: string }[] = [
@@ -40,6 +41,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const [needsEmail, setNeedsEmail] = useState(false);
   const [profile, setProfile] = useState({ full_name: '', dob: '', location: '' });
   const [heardFrom, setHeardFrom] = useState<string[]>([]);
   const [useCase, setUseCase] = useState<string[]>([]);
@@ -51,6 +53,14 @@ export default function OnboardingPage() {
       router.replace('/auth/signup');
       return;
     }
+    // The social callback appends ?collect=email when the provider disclosed
+    // none. Confirmed against the stored profile rather than trusted from the
+    // query string alone, so a hand-edited URL cannot force the prompt onto
+    // someone whose address is already fine.
+    const flagged = new URLSearchParams(window.location.search).get('collect') === 'email';
+    const stored  = localStorage.getItem(TOKEN_KEYS.USER);
+    const placeholder = stored ? String(JSON.parse(stored)?.email ?? '').endsWith('.invalid') : false;
+    setNeedsEmail(flagged && placeholder);
     setAuthChecked(true);
   }, [hydrate, router]);
 
@@ -100,6 +110,22 @@ export default function OnboardingPage() {
 
   if (!authChecked) {
     return <div className="min-h-screen flex items-center justify-center"><Spinner size={32} /></div>;
+  }
+
+  // Signed in through a provider that gave us no email (Instagram, TikTok, or
+  // a phone-only Facebook account). Collect one before the wizard: step 1
+  // asks for a name and birthday, and a birthday is useless if we can't mail
+  // anything to the person whose birthday it is.
+  if (needsEmail) {
+    return (
+      <div className="min-h-screen flex flex-col relative">
+        <WavyBackground />
+        <header className="relative p-6 z-10"><Logo size="sm" /></header>
+        <div className="relative flex-1 flex items-center justify-center p-6 z-10">
+          <EmailClaimGate onDone={() => setNeedsEmail(false)} />
+        </div>
+      </div>
+    );
   }
 
   return (

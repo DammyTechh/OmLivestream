@@ -223,8 +223,68 @@ export function scheduleTrialManagementCron(): void {
   logger.info('Trial management cron scheduled (daily 09:00 UTC)');
 }
 
+/**
+ * Notification and AI-history retention — runs daily at 03:00 UTC.
+ *
+ * The table only ever grows: every go-live, every recording, every renewal
+ * writes a row, and the bell shows the newest thirty. Without this, a heavy
+ * account accumulates thousands of rows nobody will ever scroll to, and the
+ * unread count query gets slower every month for no benefit.
+ *
+ * Two windows rather than one, because the rows mean different things. A row
+ * the user has seen has done its whole job, so it goes after 30 days. An
+ * unread row might still be the only record that a stream failed to reach a
+ * platform, so it is kept for 90 — long enough to be useful, short enough
+ * that the table stays bounded.
+ */
+export function scheduleNotificationRetentionCron(): void {
+  cron.schedule('0 3 * * *', async () => {
+    if (!await claimRun('notification-retention')) return;
+
+    const now       = Date.now();
+    const readCut   = new Date(now - 30 * 86_400_000).toISOString();
+    const anyCut    = new Date(now - 90 * 86_400_000).toISOString();
+
+    // Deleted by age, not by id list: this is a bulk statement Postgres can
+    // satisfy from idx_notifications_user_created, and pulling the ids into
+    // Node first would move tens of thousands of uuids over the wire to
+    // achieve exactly the same delete.
+    const [readRes, oldRes] = await Promise.all([
+      supabaseAdmin.from('notifications').delete()
+        .not('read_at', 'is', null).lt('read_at', readCut).select('id'),
+      supabaseAdmin.from('notifications').delete()
+        .lt('created_at', anyCut).select('id'),
+    ]);
+
+    if (readRes.error || oldRes.error) {
+      logger.error({ readErr: readRes.error, oldErr: oldRes.error }, 'Notification retention sweep failed');
+      return;
+    }
+
+    // AI transcripts age out on the same sweep. Only the last 10 turns are
+    // ever replayed to the model, so a month-old message is storage with no
+    // reader — and it is chat content, which is the last thing to keep
+    // indefinitely without a reason.
+    const chatCut = new Date(now - 30 * 86_400_000).toISOString();
+    const { data: chatDeleted, error: chatErr } = await supabaseAdmin
+      .from('ai_messages').delete().lt('created_at', chatCut).select('id');
+    if (chatErr) logger.warn({ err: chatErr }, 'AI history sweep failed');
+
+    logger.info(
+      {
+        readDeleted:  readRes.data?.length ?? 0,
+        agedDeleted:  oldRes.data?.length ?? 0,
+        chatDeleted:  chatDeleted?.length ?? 0,
+      },
+      'Notification retention cron finished',
+    );
+  });
+  logger.info('Notification retention cron scheduled (daily 03:00 UTC)');
+}
+
 export function startCronJobs(): void {
   scheduleTrialManagementCron();
   scheduleBirthdayCron();
   scheduleReEngagementCron();
+  scheduleNotificationRetentionCron();
 }

@@ -2,12 +2,29 @@ import { FastifyInstance } from 'fastify';
 import { authenticate } from '../../middleware/auth';
 import {
   sendOtpHandler, verifyOtpHandler, getSocialUrlHandler,
-  socialOAuthHandler, refreshHandler, logoutHandler,
+  socialCallbackHandler, socialExchangeHandler, socialOAuthHandler,
+  requestEmailClaimHandler, confirmEmailClaimHandler,
+  refreshHandler, logoutHandler,
 } from './auth.controller';
 import {
   sendOtpJsonSchema, verifyOtpJsonSchema, socialUrlJsonSchema,
-  socialOAuthJsonSchema, refreshJsonSchema, logoutJsonSchema,
+  socialCallbackJsonSchema, socialExchangeJsonSchema,
+  socialOAuthJsonSchema, emailClaimRequestJsonSchema, emailClaimConfirmJsonSchema,
+  refreshJsonSchema, logoutJsonSchema,
 } from './auth.schema';
+import { SOCIAL_PROVIDERS, type SocialProvider } from './social-providers';
+import { sendSuccess } from '../../utils/response';
+
+/** Registered once per provider, from one list, so a provider cannot be
+ *  half-wired — an authorize URL with no callback to receive the redirect is
+ *  exactly the state this flow was in before. */
+const PROVIDERS: { id: SocialProvider; label: string }[] = [
+  { id: 'google',    label: 'Google'    },
+  { id: 'facebook',  label: 'Facebook'  },
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'tiktok',    label: 'TikTok'    },
+  { id: 'twitch',    label: 'Twitch'    },
+];
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {
 
@@ -15,21 +32,46 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/send-otp',   { schema: sendOtpJsonSchema },   sendOtpHandler);
   fastify.post('/verify-otp', { schema: verifyOtpJsonSchema }, verifyOtpHandler);
 
-  // ── Social OAuth — get redirect URL ──────────────────────────
-  // Frontend calls these to get the URL, then redirects user to it
-  fastify.get('/social/google/url',    { schema: socialUrlJsonSchema('Google') },    getSocialUrlHandler('google'));
-  fastify.get('/social/facebook/url',  { schema: socialUrlJsonSchema('Facebook') },  getSocialUrlHandler('facebook'));
-  fastify.get('/social/instagram/url', { schema: socialUrlJsonSchema('Instagram') }, getSocialUrlHandler('instagram'));
-  fastify.get('/social/tiktok/url',    { schema: socialUrlJsonSchema('TikTok') },    getSocialUrlHandler('tiktok'));
-  fastify.get('/social/twitch/url',    { schema: socialUrlJsonSchema('Twitch') },    getSocialUrlHandler('twitch'));
+  // ── Social OAuth ──────────────────────────────────────────────
+  for (const { id, label } of PROVIDERS) {
+    // 1. Frontend asks for the URL to send the browser to.
+    fastify.get(`/social/${id}/url`, { schema: socialUrlJsonSchema(label) }, getSocialUrlHandler(id));
 
-  // ── Social OAuth — exchange code for tokens ───────────────────
-  // Frontend calls these after provider redirects back with ?code=...
-  fastify.post('/social/google',    { schema: socialOAuthJsonSchema('Google') },    socialOAuthHandler('google'));
-  fastify.post('/social/facebook',  { schema: socialOAuthJsonSchema('Facebook') },  socialOAuthHandler('facebook'));
-  fastify.post('/social/instagram', { schema: socialOAuthJsonSchema('Instagram') }, socialOAuthHandler('instagram'));
-  fastify.post('/social/tiktok',    { schema: socialOAuthJsonSchema('TikTok') },    socialOAuthHandler('tiktok'));
-  fastify.post('/social/twitch',    { schema: socialOAuthJsonSchema('Twitch') },    socialOAuthHandler('twitch'));
+    // 2. The provider redirects the browser back here. This path must match
+    //    the redirect URI registered in the provider's console exactly —
+    //    see Docs/PLATFORM_API_SETUP.md.
+    fastify.get(`/social/${id}/callback`, { schema: socialCallbackJsonSchema(label) }, socialCallbackHandler(id));
+
+    // Legacy code-post path, retained for bundles cached mid-deploy.
+    fastify.post(`/social/${id}`, { schema: socialOAuthJsonSchema(label) }, socialOAuthHandler(id));
+  }
+
+  // 3. Frontend trades its one-time ticket for the token pair.
+  fastify.post('/social/exchange', { schema: socialExchangeJsonSchema }, socialExchangeHandler);
+
+  /** Which buttons the sign-in page should render. A provider with no
+   *  credentials configured returns a 503 from the URL route, so showing its
+   *  button would be advertising a dead end. */
+  fastify.get('/social/providers', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Which social sign-in providers are configured and usable',
+    },
+  }, async (_req, reply) => {
+    const available = PROVIDERS
+      .filter(({ id }) => Boolean(SOCIAL_PROVIDERS[id].clientId && SOCIAL_PROVIDERS[id].clientSecret))
+      .map(({ id, label }) => ({ id, label }));
+    reply.header('Cache-Control', 'public, max-age=300');
+    sendSuccess(reply, available);
+  });
+
+  // ── Email claim — authenticated, for social accounts with no address ──
+  fastify.post('/email/claim', {
+    schema: emailClaimRequestJsonSchema, preHandler: [authenticate],
+  }, requestEmailClaimHandler);
+  fastify.post('/email/claim/confirm', {
+    schema: emailClaimConfirmJsonSchema, preHandler: [authenticate],
+  }, confirmEmailClaimHandler);
 
   // ── Token management ─────────────────────────────────────────
   fastify.post('/refresh', { schema: refreshJsonSchema }, refreshHandler);

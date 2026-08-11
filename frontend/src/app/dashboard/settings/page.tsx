@@ -2,32 +2,13 @@
 import { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { User as UserIcon, Save, Upload, Sparkles, X } from 'lucide-react';
+import { User as UserIcon, Save, Upload, X } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api, getApiError } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 
-const HEARD_FROM = [
-  { value: 'social_media',     label: 'Social Media'    },
-  { value: 'friend_referral',  label: 'A Friend'        },
-  { value: 'google_search',    label: 'Google Search'   },
-  { value: 'content_creator',  label: 'Content Creator' },
-  { value: 'youtube_ad',       label: 'YouTube Ad'      },
-  { value: 'other',            label: 'Other'           },
-];
-
-const USE_CASES = [
-  { value: 'entertainment',      label: 'Entertainment'       },
-  { value: 'gaming',             label: 'Gaming'              },
-  { value: 'music_performance',  label: 'Music & DJ Sets'     },
-  { value: 'education',          label: 'Tutorials & Courses' },
-  { value: 'business_brand',     label: 'Business / Brand'    },
-  { value: 'fitness_wellness',   label: 'Fitness & Wellness'  },
-  { value: 'events_concerts',    label: 'Events & Concerts'   },
-  { value: 'news_commentary',    label: 'News & Commentary'   },
-];
 
 export default function SettingsPage() {
   const { user, refreshProfile } = useAuth();
@@ -37,11 +18,8 @@ export default function SettingsPage() {
     location: '',
     avatar_url: '',
   });
-  const [heardFrom, setHeardFrom] = useState<string[]>([]);
-  const [useCase, setUseCase] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingSurvey, setSavingSurvey] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,17 +36,9 @@ export default function SettingsPage() {
             avatar_url: data.profile.avatar_url ?? '',
           });
         }
-        if (data?.survey) {
-          setHeardFrom(data.survey.heard_from || []);
-          setUseCase(data.survey.use_case || []);
-        }
       } catch { /* silent */ } finally { setLoading(false); }
     })();
   }, []);
-
-  const toggle = (arr: string[], setter: (v: string[]) => void, v: string) => {
-    setter(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
-  };
 
   const handleAvatarChoose = () => fileInputRef.current?.click();
 
@@ -139,18 +109,6 @@ export default function SettingsPage() {
     } finally { setSavingProfile(false); }
   };
 
-  const saveSurvey = async () => {
-    if (heardFrom.length === 0) return toast.error('Please pick at least one option for "How did you find us?"');
-    if (useCase.length === 0)   return toast.error('Please pick at least one option for "What will you stream?"');
-    setSavingSurvey(true);
-    try {
-      await api.post('/users/onboarding/survey', { heard_from: heardFrom, use_case: useCase });
-      toast.success('Survey updated');
-    } catch (err) {
-      toast.error(getApiError(err, 'Could not save survey'));
-    } finally { setSavingSurvey(false); }
-  };
-
   const deleteAccount = async () => {
     const txt = window.prompt('Type DELETE to confirm account deletion. This cannot be undone.');
     if (txt !== 'DELETE') return;
@@ -169,7 +127,7 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-muted mt-1">Manage your account, profile, and preferences.</p>
+        <p className="text-muted mt-1">Manage your account and profile.</p>
       </div>
 
       {/* PROFILE */}
@@ -240,60 +198,6 @@ export default function SettingsPage() {
           <div className="flex justify-end pt-2 border-t border-white/5">
             <Button onClick={saveProfile} loading={savingProfile} icon={<Save size={16} />}>
               Save Profile
-            </Button>
-          </div>
-        </Card>
-      </motion.div>
-
-      {/* SURVEY */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <Card className="p-6 space-y-5">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles size={16} className="text-primary" />
-            <h2 className="font-display text-xl font-semibold">Tell us about you</h2>
-          </div>
-
-          <div>
-            <label className="label">How did you hear about us?</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {HEARD_FROM.map((item) => (
-                <button
-                  key={item.value}
-                  onClick={() => toggle(heardFrom, setHeardFrom, item.value)}
-                  className={`p-3 rounded-xl border text-sm font-medium transition-all ${
-                    heardFrom.includes(item.value)
-                      ? 'border-primary bg-primary/10 text-text'
-                      : 'border-white/10 bg-white/[0.02] text-muted hover:border-white/20'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="label">What will you stream?</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {USE_CASES.map((item) => (
-                <button
-                  key={item.value}
-                  onClick={() => toggle(useCase, setUseCase, item.value)}
-                  className={`p-3 rounded-xl border text-sm font-medium transition-all ${
-                    useCase.includes(item.value)
-                      ? 'border-primary bg-primary/10 text-text'
-                      : 'border-white/10 bg-white/[0.02] text-muted hover:border-white/20'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-2 border-t border-white/5">
-            <Button onClick={saveSurvey} loading={savingSurvey} icon={<Save size={16} />}>
-              Save Preferences
             </Button>
           </div>
         </Card>

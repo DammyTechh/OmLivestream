@@ -9,11 +9,15 @@ import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/store/auth';
 import { formatNumber, timeAgo } from '@/lib/utils';
 
+/**
+ * GET /analytics/overview. camelCase, matching what the route sends
+ * (analytics.routes.ts:50). The previous snake_case declaration matched no
+ * field on the response, so all three cards were permanently zero.
+ */
 interface Overview {
-  total_views?: number;
-  total_impressions?: number;
-  total_engagement?: number;
-  streams_count?: number;
+  totalViews?:    number;
+  peakViewers?:   number;
+  totalComments?: number;
 }
 
 interface Stream {
@@ -57,10 +61,15 @@ export default function DashboardHomePage() {
   }, []);
 
   const stats = [
-    { label: 'Total Views',       value: overview.total_views ?? 0,       icon: Eye,        color: 'from-primary to-accent' },
-    { label: 'Impressions',       value: overview.total_impressions ?? 0, icon: TrendingUp, color: 'from-blue-500 to-primary' },
-    { label: 'Engagements',       value: overview.total_engagement ?? 0,  icon: Heart,      color: 'from-accent to-danger' },
-    { label: 'Streams',           value: recent.length,                   icon: Radio,      color: 'from-primary-deep to-primary' },
+    { label: 'Total views',     value: overview.totalViews ?? 0,         icon: Eye,        color: 'from-primary to-accent' },
+    // Peak concurrent audience, not impressions: no live API this app reads
+    // reports impressions, so that card could only ever have shown zero.
+    { label: 'Peak audience',   value: overview.peakViewers ?? 0,        icon: TrendingUp, color: 'from-blue-500 to-primary' },
+    { label: 'Comments',        value: overview.totalComments ?? 0,      icon: Heart,      color: 'from-accent to-danger' },
+    // The streams endpoint returns at most 5; counting the array here would
+    // show "5" for any account with more. The overview RPC does not return a
+    // stream count, so label this card for what it is.
+    { label: 'Recent streams',  value: recent.length,                    icon: Radio,      color: 'from-primary-deep to-primary' },
   ];
 
   return (
@@ -122,7 +131,9 @@ export default function DashboardHomePage() {
                 <s.icon size={18} className="text-white" />
               </div>
               <div className="font-display text-3xl font-semibold tracking-tight">
-                {formatNumber(s.value)}
+                {loading
+                  ? <span className="inline-block w-16 h-8 rounded bg-white/5 animate-pulse align-middle" />
+                  : formatNumber(s.value)}
               </div>
               <div className="text-xs text-muted mt-1">{s.label}</div>
             </Card>

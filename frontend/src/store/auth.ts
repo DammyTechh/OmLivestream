@@ -1,6 +1,7 @@
 'use client';
 import { create } from 'zustand';
 import { api, TOKEN_KEYS, unwrap } from '@/lib/api';
+import { resetSocket } from '@/lib/socket';
 
 export type Plan = 'free_trial' | 'free' | 'premium';
 export type Role = 'super_admin' | 'admin' | 'support';
@@ -88,6 +89,10 @@ export const useAuth = create<AuthState>((set, get) => ({
     localStorage.removeItem(TOKEN_KEYS.ACCESS);
     localStorage.removeItem(TOKEN_KEYS.REFRESH);
     localStorage.removeItem(TOKEN_KEYS.USER);
+    // The socket authenticates once, at handshake, with the token that was in
+    // localStorage then. Left open across a sign-out it keeps delivering the
+    // previous user's notifications to whoever signs in next.
+    resetSocket();
     set({ accessToken: null, refreshToken: null, user: null });
   },
 }));

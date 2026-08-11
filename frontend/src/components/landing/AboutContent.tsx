@@ -10,7 +10,7 @@ const FEATURES = [
   { Icon: Radio,             title: 'Multi-Platform Streaming', desc: 'Broadcast to Facebook, TikTok, Instagram, Twitch, YouTube and more at once — from a single unified dashboard.' },
   { Icon: Gauge,             title: 'Network Condition Detection', desc: 'Automatically adjusts your streaming resolution to your internet quality for a smoother, more reliable broadcast.' },
   { Icon: MessageSquare,     title: 'Unified Comment Dashboard', desc: 'View and respond to comments from every connected platform in one centralized place.' },
-  { Icon: TrendingUp,        title: 'Live Analytics & Impressions', desc: 'Track audience engagement and stream performance as it happens.' },
+  { Icon: TrendingUp,        title: 'Live Audience Analytics', desc: 'Track audience engagement and stream performance as it happens.' },
   { Icon: Video,             title: 'Automatic Live Recording', desc: 'Every live session is saved automatically, ready to reuse whenever you need it.' },
   { Icon: Wand2,             title: 'AI-Powered Video Editing', desc: 'Turn recorded live sessions into polished, shareable content in a few clicks.' },
   { Icon: Scissors,          title: 'Manual Editor Workspace', desc: 'Prefer full creative control? Fine-tune and export your videos before saving to your device.' },

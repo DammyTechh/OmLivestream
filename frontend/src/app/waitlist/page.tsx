@@ -8,10 +8,11 @@ import { Navbar } from '@/components/landing/Navbar';
 import { Footer } from '@/components/landing/Footer';
 import { WavyBackground } from '@/components/ui/WavyBackground';
 import { api, getApiError } from '@/lib/api';
+import { WAITLIST_DISCOUNT_PCT, WAITLIST_DISCOUNT_MONTHS } from '@/lib/pricing';
 
 const BENEFITS = [
   { Icon: Gift,    title: '1 Month FREE',            desc: 'Full Premium access, completely free for your first month' },
-  { Icon: Percent, title: '50% Off First 6 Months',  desc: 'Half price on your first 6 months of Premium' },
+  { Icon: Percent, title: `${WAITLIST_DISCOUNT_PCT}% Off First ${WAITLIST_DISCOUNT_MONTHS} Months`, desc: `${WAITLIST_DISCOUNT_PCT}% off every month for your first ${WAITLIST_DISCOUNT_MONTHS} months of Premium` },
   { Icon: Zap,     title: 'Extended Trial (120 days)', desc: 'Waitlist members get 30 extra trial days on signup' },
 ];
 

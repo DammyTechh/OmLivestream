@@ -215,6 +215,21 @@ export const redis = {
 logger.info({ host: safeHost(env.UPSTASH_REDIS_REST_URL) }, 'Redis (Upstash REST) initialised');
 
 
+/**
+ * TLS options for a TCP Redis URL — `{}` when the URL is not `rediss://`.
+ *
+ * ioredis applies a `tls` option unconditionally when present, so passing it
+ * against a plaintext `redis://` server makes the connection fail the TLS
+ * handshake with ERR_SSL_WRONG_VERSION_NUMBER. Upstash is `rediss://` so
+ * production was unaffected, but a local or self-hosted plaintext Redis lost
+ * every TCP client — and because the Socket.io adapter degrades on purpose,
+ * that showed up as rooms quietly not spanning instances rather than as a
+ * startup failure.
+ */
+function tlsFor(url: string): { tls?: { rejectUnauthorized: boolean } } {
+  return url.startsWith('rediss://') ? { tls: { rejectUnauthorized: false } } : {};
+}
+
 // ── BullMQ connection — only created if TCP Redis URL is configured
 // If UPSTASH_REDIS_URL is empty (local dev without TCP access), returns null
 // Queues/workers check for null and skip registration
@@ -225,7 +240,7 @@ export function createBullConnection() {
   const client = new IORedis(env.UPSTASH_REDIS_URL, {
     maxRetriesPerRequest: null,
     enableReadyCheck:     false,
-    tls:                  { rejectUnauthorized: false },
+    ...tlsFor(env.UPSTASH_REDIS_URL),
     lazyConnect:          true,
     connectTimeout:       5000,
     retryStrategy:        (times: number) => (times > 3 ? null : Math.min(times * 1000, 3000)),
@@ -257,7 +272,7 @@ export function createSocketAdapterClients(): { pub: any; sub: any } | null {
   const opts = {
     maxRetriesPerRequest: null,   // required: the adapter must not fail fast
     enableReadyCheck:     false,
-    tls:                  { rejectUnauthorized: false },
+    ...tlsFor(env.UPSTASH_REDIS_URL),
     connectTimeout:       5000,
   };
   const pub = new IORedis(env.UPSTASH_REDIS_URL, opts);
@@ -291,7 +306,7 @@ export function createRateLimitRedis(): any {
     maxRetriesPerRequest: 1,
     enableReadyCheck:     false,
     enableOfflineQueue:   false,
-    tls:                  { rejectUnauthorized: false },
+    ...tlsFor(env.UPSTASH_REDIS_URL),
     connectTimeout:       3000,
     lazyConnect:          true,
   });
@@ -305,6 +320,7 @@ export const REDIS_KEYS = {
   OTP_ATTEMPTS:     (userId: string)      => `otp:attempts:${userId}`,
   OTP_RATE:         (email: string)       => `otp:rate:${email}`,
   OAUTH_STATE:      (state: string)       => `oauth:state:${state}`,
+  OAUTH_STATE_V2:   (state: string)       => `oauth:auth:state:${state}`,
   CRON_LOCK:        (job: string, day: string) => `cron:lock:${job}:${day}`,
   STREAM_VIEWERS:   (streamId: string)    => `stream:viewers:${streamId}`,
   STREAM_LIVE:      (streamId: string)    => `stream:live:${streamId}`,

@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react';
 import { useLiveStreamGuard } from '@/hooks/useLiveStreamGuard';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Radio, Square, Users, MessageSquare, TrendingUp, Send, Eye, Heart } from 'lucide-react';
+import { ArrowLeft, Radio, Square, Users, MessageSquare, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { io, Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
+import { acquireSocket, releaseSocket } from '@/lib/socket';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { api, unwrap, getApiError, TOKEN_KEYS } from '@/lib/api';
+import { api, unwrap, getApiError } from '@/lib/api';
 import { formatNumber } from '@/lib/utils';
 import {
   YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon,
@@ -45,12 +46,22 @@ interface Comment {
   platformCommentId: string;
 }
 
+/**
+ * What we can actually measure per platform during a broadcast.
+ *
+ * Viewers arrive on 'metrics:update' from the backend's metrics sampler, which
+ * reads YouTube's concurrentViewers and Facebook's live_views. Comments are
+ * counted from 'comment:new' as they land.
+ *
+ * Impressions and engagement used to sit alongside these. Nothing produced
+ * either — no live API reports impressions, and engagement had no emitter at
+ * all — so both rendered a permanent zero next to two real numbers, which is
+ * worse than not showing them.
+ */
 interface PlatformMetrics {
   platform: string;
-  viewers:      number;
-  impressions:  number;
-  engagement:   number;
-  comments:     number;
+  viewers:  number;
+  comments: number;
 }
 
 export default function StreamDetailPage() {
@@ -74,35 +85,48 @@ export default function StreamDetailPage() {
 
   useEffect(() => {
     if (!stream || stream.status !== 'live') return;
-    const token = localStorage.getItem(TOKEN_KEYS.ACCESS);
-    const sock  = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', { auth: { token } });
-    sock.emit('join:stream', { streamId: id });
-    sock.on('viewers:update', (data: { count: number; byPlatform?: Record<string, number> }) => {
-      setViewers(data.count);
-      if (data.byPlatform) {
-        setPlatformMetrics((prev) => {
-          const next = { ...prev };
-          Object.entries(data.byPlatform!).forEach(([p, v]) => {
-            next[p] = { ...(next[p] ?? { platform: p, viewers: 0, impressions: 0, engagement: 0, comments: 0 }), viewers: v };
-          });
-          return next;
-        });
-      }
-    });
+    const sock = acquireSocket();
+    if (!sock) return;
+    // A bare id, not { streamId }. The server's handler signature is
+    // (streamId: string), so an object arrived as the id, failed the liveness
+    // lookup, and the join silently never happened.
+    sock.emit('join:stream', id);
+    // 'stream:viewers' is what the server actually emits — the old
+    // 'viewers:update' listener could never fire, so the count on this page
+    // sat at zero for the whole broadcast. It carries the count of connected
+    // dashboard sockets; the per-platform audience arrives on 'metrics:update'.
+    sock.on('stream:viewers', (data: { count: number }) => setViewers(data.count));
     sock.on('comment:new', (c: Comment) => {
       setComments((prev) => [c, ...prev].slice(0, 200));
       setPlatformMetrics((prev) => {
         const next = { ...prev };
         const p = c.platform;
-        next[p] = { ...(next[p] ?? { platform: p, viewers: 0, impressions: 0, engagement: 0, comments: 0 }), comments: (next[p]?.comments ?? 0) + 1 };
+        next[p] = { ...(next[p] ?? { platform: p, viewers: 0, comments: 0 }), comments: (next[p]?.comments ?? 0) + 1 };
         return next;
       });
     });
-    sock.on('metrics:update', (payload: Record<string, PlatformMetrics>) => {
-      setPlatformMetrics((prev) => ({ ...prev, ...payload }));
+    // Concurrent viewers per platform, sampled from the platforms' own APIs
+    // every 30s. Merged rather than replaced: a platform missing from a tick
+    // was unreadable, not empty, and its comment count lives here too.
+    sock.on('metrics:update', (viewersByPlatform: Record<string, number>) => {
+      setPlatformMetrics((prev) => {
+        const next = { ...prev };
+        Object.entries(viewersByPlatform).forEach(([p, v]) => {
+          next[p] = { ...(next[p] ?? { platform: p, viewers: 0, comments: 0 }), viewers: v };
+        });
+        return next;
+      });
     });
     setSocket(sock);
-    return () => { sock.disconnect(); };
+    return () => {
+      // Leave the room explicitly. The server decrements on disconnect too,
+      // but the connection is shared now and outlives this page.
+      sock.emit('leave:stream', id);
+      sock.off('stream:viewers');
+      sock.off('comment:new');
+      sock.off('metrics:update');
+      releaseSocket();
+    };
   }, [stream?.status, id]);
 
   async function fetchStream() {
@@ -190,7 +214,7 @@ export default function StreamDetailPage() {
         </div>
       </div>
 
-      {/* Per-platform impressions grid */}
+      {/* Per-platform live audience and comments */}
       {stream.status === 'live' && (
         <div>
           <h2 className="font-display text-xl font-semibold mb-3">Live stats by platform</h2>
@@ -208,14 +232,6 @@ export default function StreamDetailPage() {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted flex items-center gap-1.5"><Users size={12} /> Viewers</span>
                       <span className="font-semibold">{formatNumber(m?.viewers ?? 0)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted flex items-center gap-1.5"><Eye size={12} /> Impressions</span>
-                      <span className="font-semibold">{formatNumber(m?.impressions ?? 0)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted flex items-center gap-1.5"><Heart size={12} /> Engagement</span>
-                      <span className="font-semibold">{formatNumber(m?.engagement ?? 0)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted flex items-center gap-1.5"><MessageSquare size={12} /> Comments</span>

@@ -96,6 +96,10 @@ openssl rand -hex 32   # → ENCRYPTION_KEY, RTMP_RELAY_SECRET
 
 ## Getting API Keys
 
+> Quick reference only. For per-platform console walkthroughs, exact redirect
+> URIs, scope tables, approval lead times and live-comment setup, see
+> **[PLATFORM_API_SETUP.md](./PLATFORM_API_SETUP.md)**.
+
 ### Google / YouTube
 1. [console.cloud.google.com](https://console.cloud.google.com) → New project
 2. Enable: YouTube Data API v3, YouTube Live Streaming API

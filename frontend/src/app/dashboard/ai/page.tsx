@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bot, Send, Sparkles, Wand2, AlertCircle, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
@@ -7,6 +7,18 @@ import { Button } from '@/components/ui/Button';
 import { api, getApiError, unwrap } from '@/lib/api';
 
 interface Message { role: 'user' | 'assistant'; content: string; }
+
+/** Must match the enum the backend accepts, or the request is rejected. */
+const TITLE_PLATFORMS = [
+  { id: 'youtube',   label: 'YouTube'   },
+  { id: 'tiktok',    label: 'TikTok'    },
+  { id: 'instagram', label: 'Instagram' },
+  { id: 'facebook',  label: 'Facebook'  },
+  { id: 'twitch',    label: 'Twitch'    },
+  { id: 'twitter',   label: 'X'         },
+  { id: 'linkedin',  label: 'LinkedIn'  },
+  { id: 'kick',      label: 'Kick'      },
+] as const;
 
 export default function AIStudioPage() {
   const [mode, setMode] = useState<'chat' | 'title'>('chat');
@@ -16,9 +28,29 @@ export default function AIStudioPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [quotaExhausted, setQuotaExhausted] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Reopen the conversation rather than restarting it. History lives on the
+  // server now, so it survives a reload — and the greeting below is only the
+  // right first thing to say when there is nothing to restore.
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = unwrap<{ messages: Message[] }>(await api.get('/ai/chat/history'));
+        if (data.messages?.length) setMessages(data.messages);
+      } catch { /* first visit, or history unavailable — keep the greeting */ }
+    })();
+  }, []);
+
+  // Pin to the newest message. Without this the reply lands below the fold
+  // and a long answer looks like nothing happened.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages, loading]);
 
   const [titlePrompt, setTitlePrompt] = useState('');
   const [titles, setTitles] = useState<string[]>([]);
+  const [platforms, setPlatforms] = useState<string[]>(['youtube', 'tiktok', 'instagram', 'twitch']);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -27,6 +59,9 @@ export default function AIStudioPage() {
     setMessages((prev) => [...prev, { role: 'user', content: userMsg }]);
     setLoading(true);
     try {
+      // No history in the payload: the server keeps its own record, and the
+      // field it used to accept is ignored. Sending it back was how a client
+      // could rewrite what the assistant had "previously said".
       const data = unwrap<{ reply: string }>(await api.post('/ai/chat', { message: userMsg }));
       setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
     } catch (err) {
@@ -40,8 +75,11 @@ export default function AIStudioPage() {
     if (!titlePrompt.trim()) return toast.error('Describe your stream first');
     setLoading(true);
     try {
-      const data = unwrap<{ titles: string[] }>(await api.post('/ai/generate-title', { topic: titlePrompt }));
+      const data = unwrap<{ titles: string[] }>(
+        await api.post('/ai/generate-title', { topic: titlePrompt, platforms }),
+      );
       setTitles(data.titles || []);
+      if (!data.titles?.length) toast.error('No titles came back — try describing the stream differently');
     } catch (err) {
       const msg = getApiError(err, 'Could not generate titles');
       if (msg.includes('AI is temporarily unavailable')) setQuotaExhausted(true);
@@ -85,7 +123,7 @@ export default function AIStudioPage() {
 
       {mode === 'chat' ? (
         <Card className="p-0 overflow-hidden">
-          <div className="h-[500px] overflow-y-auto p-6 space-y-4">
+          <div ref={scrollRef} className="h-[500px] overflow-y-auto p-6 space-y-4">
             {messages.map((m, i) => (
               <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                 <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
@@ -143,12 +181,41 @@ export default function AIStudioPage() {
               className="input resize-none"
             />
           </div>
-          <Button onClick={generateTitles} loading={loading} icon={<Wand2 size={16} />}>
-            Generate 5 titles
+          <div>
+            <label className="label">Platforms</label>
+            <div className="flex flex-wrap gap-2">
+              {TITLE_PLATFORMS.map((p) => {
+                const on = platforms.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPlatforms((prev) =>
+                      prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id])}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${
+                      on ? 'bg-primary/15 border-primary/40 text-text' : 'bg-white/5 border-white/10 text-muted hover:bg-white/10'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Disabled with none selected: the request would 422 on the
+              server's min(1), which surfaces as an opaque failure. */}
+          <Button
+            onClick={generateTitles}
+            loading={loading}
+            disabled={platforms.length === 0}
+            icon={<Wand2 size={16} />}
+          >
+            Generate titles
           </Button>
           {titles.length > 0 && (
             <div className="space-y-2 pt-4 border-t border-border">
-              <p className="text-xs uppercase tracking-widest text-muted">Suggested titles</p>
+              <p className="text-xs uppercase tracking-widest text-muted">Suggested titles — click to copy</p>
               {titles.map((t, i) => (
                 <button
                   key={i}

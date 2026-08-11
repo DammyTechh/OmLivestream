@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { api, getApiError, unwrap } from '@/lib/api';
+import { PREMIUM_PRICE, WAITLIST_DISCOUNT_PCT, WAITLIST_DISCOUNT_MONTHS, naira } from '@/lib/pricing';
 
 function PaymentContent() {
   const params = useSearchParams();
@@ -18,7 +19,7 @@ function PaymentContent() {
   const [loadingMethod, setLoadingMethod] = useState<'card' | 'google_pay' | null>(null);
   const [discountCode, setDiscountCode] = useState(params.get('code') || '');
 
-  const price = { monthly: 15000, annual: 153000 };
+  const price = PREMIUM_PRICE;
   const total = price[cycle];
 
   const paystackCheckout = async (paymentMethod: 'card' | 'google_pay') => {
@@ -101,7 +102,7 @@ function PaymentContent() {
                 >
                   {loadingMethod === 'card'
                     ? 'Redirecting to secure checkout…'
-                    : <><CreditCard size={18} /> Pay with card · ₦{total.toLocaleString()}</>
+                    : <><CreditCard size={18} /> Pay with card · {naira(total)}</>
                   }
                 </button>
 
@@ -121,7 +122,8 @@ function PaymentContent() {
                   </div>
                   <p className="text-xs text-muted mt-2 flex items-start gap-1.5">
                     <Info size={11} className="shrink-0 mt-0.5" />
-                    Waitlist rewards: <strong className="text-text">OMLS1FREE-…</strong> gives 1 month free, <strong className="text-text">OMLS6DISC-…</strong> gives 50% off 6 months. Codes are applied automatically at checkout.
+                    Waitlist rewards only. <strong className="text-text">OMLS1FREE-…</strong> gives 1 month free — redeem it from Billing, not here.{' '}
+                    <strong className="text-text">OMLS6DISC-…</strong> takes {WAITLIST_DISCOUNT_PCT}% off your first {WAITLIST_DISCOUNT_MONTHS} months and is applied to this payment.
                   </p>
                 </div>
               </Card>
@@ -137,12 +139,12 @@ function PaymentContent() {
               <div className="space-y-3 mb-8">
                 <label className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition ${cycle === 'monthly' ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/[0.02]'}`}>
                   <input type="radio" checked={cycle === 'monthly'} onChange={() => setCycle('monthly')} className="accent-primary" />
-                  <span className="flex-1 font-display font-semibold">₦{price.monthly.toLocaleString()} <span className="text-sm font-normal text-muted">/ month</span></span>
+                  <span className="flex-1 font-display font-semibold">{naira(price.monthly)} <span className="text-sm font-normal text-muted">/ month</span></span>
                 </label>
                 <label className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition ${cycle === 'annual' ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/[0.02]'}`}>
                   <input type="radio" checked={cycle === 'annual'} onChange={() => setCycle('annual')} className="accent-primary" />
-                  <span className="flex-1 font-display font-semibold">₦{price.annual.toLocaleString()} <span className="text-sm font-normal text-muted">/ year</span></span>
-                  <span className="text-xs px-2 py-1 rounded-full bg-success/20 text-success">−15%</span>
+                  <span className="flex-1 font-display font-semibold">{naira(price.annual)} <span className="text-sm font-normal text-muted">/ year</span></span>
+                  <span className="text-xs text-muted">12 × {naira(price.monthly)}</span>
                 </label>
               </div>
 

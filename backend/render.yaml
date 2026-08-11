@@ -136,6 +136,31 @@ services:
       - key: LINKEDIN_REDIRECT_URI
         sync: false
 
+      # Sign-in OAuth clients. Optional — each falls back to the broadcast
+      # client above, so an unset value degrades to the old behaviour rather
+      # than failing boot. Redirect URI per provider:
+      #   $API_BASE_URL/api/v1/auth/social/<provider>/callback
+      - key: AUTH_GOOGLE_CLIENT_ID
+        sync: false
+      - key: AUTH_GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: AUTH_FACEBOOK_CLIENT_ID
+        sync: false
+      - key: AUTH_FACEBOOK_CLIENT_SECRET
+        sync: false
+      - key: AUTH_INSTAGRAM_CLIENT_ID
+        sync: false
+      - key: AUTH_INSTAGRAM_CLIENT_SECRET
+        sync: false
+      - key: AUTH_TIKTOK_CLIENT_KEY
+        sync: false
+      - key: AUTH_TIKTOK_CLIENT_SECRET
+        sync: false
+      - key: AUTH_TWITCH_CLIENT_ID
+        sync: false
+      - key: AUTH_TWITCH_CLIENT_SECRET
+        sync: false
+
       - key: OTP_EXPIRY_MINUTES
         value: 10
       - key: OTP_MAX_ATTEMPTS

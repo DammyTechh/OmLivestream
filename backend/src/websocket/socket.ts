@@ -160,6 +160,21 @@ export function initSocketIO(httpServer: http.Server): IO {
     logger.debug({ userId, socketId: socket.id }, 'Socket connected');
 
     /**
+     * A room per account, joined unconditionally at connect.
+     *
+     * This is how the notifications service reaches a user without knowing
+     * anything about their sockets. Room membership — not the socket id — is
+     * the addressable unit, which matters because a user routinely has two or
+     * three tabs open and every one of them should light up. The Redis
+     * adapter makes it span instances, so the emit lands even when the tab is
+     * attached to a different process from the one that raised the event.
+     *
+     * Membership is dropped automatically on disconnect; there is no counter
+     * to keep honest here, unlike the viewer rooms below.
+     */
+    socket.join(`user:${userId}`);
+
+    /**
      * Which streams this socket counts towards.
      *
      * The counter is a bare Redis integer, so it only stays honest if every
@@ -351,6 +366,28 @@ export function broadcastViewerCount(io: IO, streamId: string, count: number): v
 
 export function broadcastStreamEnded(io: IO, streamId: string): void {
   io.to(`stream:${streamId}`).emit('stream:ended', { streamId });
+}
+
+/**
+ * Per-platform concurrent viewers, pushed from the metrics sampler each tick.
+ *
+ * The stream page had a listener for this event and a grid to render it, and
+ * nothing ever emitted it — so the grid showed zeros for the whole broadcast.
+ *
+ * Viewers only. The page's own comment counter is driven by 'comment:new',
+ * which already sees every comment; the sampler holds per-tick deltas, so
+ * sending those would overwrite a running total with the last 30 seconds.
+ *
+ * Only platforms that returned a reading this tick are included — a platform
+ * that could not be read keeps whatever the page last showed rather than
+ * dropping to zero.
+ */
+export function broadcastPlatformMetrics(
+  io: IO,
+  streamId: string,
+  viewersByPlatform: Record<string, number>,
+): void {
+  io.to(`stream:${streamId}`).emit('metrics:update', viewersByPlatform);
 }
 
 export function broadcastPlatformStatus(io: IO, streamId: string, platform: string, status: string): void {

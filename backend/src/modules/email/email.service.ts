@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { env, urls } from '../../config/env';
 import { logger } from '../../config/logger';
+import { WAITLIST_DISCOUNT_PCT, WAITLIST_DISCOUNT_MONTHS } from '../../config/pricing';
 
 const resend = new Resend(env.RESEND_API_KEY);
 
@@ -234,8 +235,8 @@ export class EmailService {
           <p style="margin:4px 0 0;color:${muted};font-size:13px;">Full Premium access, completely free for your first month</p>
         </td></tr>
         <tr><td style="padding:12px 0;border-bottom:1px solid rgba(124,58,237,0.15);">
-          <p style="margin:0;color:${text};font-size:15px;font-weight:700;">50% off your first 6 months</p>
-          <p style="margin:4px 0 0;color:${muted};font-size:13px;">Half price on your first 6 months of Premium</p>
+          <p style="margin:0;color:${text};font-size:15px;font-weight:700;">${WAITLIST_DISCOUNT_PCT}% off your first ${WAITLIST_DISCOUNT_MONTHS} months</p>
+          <p style="margin:4px 0 0;color:${muted};font-size:13px;">${WAITLIST_DISCOUNT_PCT}% off every month for your first ${WAITLIST_DISCOUNT_MONTHS} months of Premium</p>
         </td></tr>
         <tr><td style="padding:12px 0;">
           <p style="margin:0;color:${text};font-size:15px;font-weight:700;">Full Premium access</p>
@@ -259,12 +260,12 @@ export class EmailService {
         <p style="color:${muted};font-size:13px;margin:0;">Apply at checkout — your first month is completely free</p>
       </div>
       <div style="background:#14102A;border:1px solid rgba(124,58,237,0.3);border-radius:12px;padding:20px;margin-bottom:24px;">
-        <p style="color:#A855F7;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin:0 0 8px;">50% Off First 6 Months</p>
+        <p style="color:#A855F7;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;margin:0 0 8px;">${WAITLIST_DISCOUNT_PCT}% Off First ${WAITLIST_DISCOUNT_MONTHS} Months</p>
         <p style="font-family:'Courier New',monospace;font-size:22px;font-weight:700;color:${text};letter-spacing:3px;margin:0 0 8px;">${d.sixMonthCode}</p>
-        <p style="color:${muted};font-size:13px;margin:0;">Half price for 6 months</p>
+        <p style="color:${muted};font-size:13px;margin:0;">${WAITLIST_DISCOUNT_PCT}% off each of your first ${WAITLIST_DISCOUNT_MONTHS} months — enter it at checkout</p>
       </div>
       ${btn(`${urls.dashboard}/dashboard`, 'Start Streaming →')}
-      <p style="color:${muted};font-size:12px;margin:16px 0 0;">Codes expire in 90 days. Apply via Settings → Billing → Apply Code.</p>
+      <p style="color:${muted};font-size:12px;margin:16px 0 0;">Codes expire in 90 days. Redeem your free month from Billing; enter the discount code at checkout.</p>
     </td></tr>`);
     await this.send(to, 'Your OmliveStream waitlist rewards — codes inside', html);
   }

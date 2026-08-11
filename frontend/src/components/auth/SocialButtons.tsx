@@ -1,56 +1,93 @@
 'use client';
 import { api, unwrap, getApiError } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { useState } from 'react';
-import { GoogleIcon, FacebookIcon, InstagramIcon, TwitchIcon } from '@/components/ui/BrandIcons';
+import { useEffect, useState } from 'react';
+import { GoogleIcon, FacebookIcon, InstagramIcon, TwitchIcon, TikTokIcon } from '@/components/ui/BrandIcons';
 
-type Provider = 'google' | 'facebook' | 'instagram' | 'twitch';
+type Provider = 'google' | 'facebook' | 'instagram' | 'tiktok' | 'twitch';
 
-const PROVIDERS: { id: Provider; label: string; Icon: React.FC<{ size?: number }>; bg: string }[] = [
-  { id: 'google',    label: 'Google',    Icon: GoogleIcon,    bg: '#FFFFFF' },
-  { id: 'facebook',  label: 'Facebook',  Icon: FacebookIcon,  bg: '#14102A' },
-  { id: 'instagram', label: 'Instagram', Icon: InstagramIcon, bg: '#14102A' },
-  { id: 'twitch',    label: 'Twitch',    Icon: TwitchIcon,    bg: '#14102A' },
-];
+const PROVIDERS: Record<Provider, { label: string; Icon: React.FC<{ size?: number }>; bg: string }> = {
+  google:    { label: 'Google',    Icon: GoogleIcon,    bg: '#FFFFFF' },
+  facebook:  { label: 'Facebook',  Icon: FacebookIcon,  bg: '#14102A' },
+  instagram: { label: 'Instagram', Icon: InstagramIcon, bg: '#14102A' },
+  tiktok:    { label: 'TikTok',    Icon: TikTokIcon,    bg: '#14102A' },
+  twitch:    { label: 'Twitch',    Icon: TwitchIcon,    bg: '#14102A' },
+};
+
+const GRID_COLS: Record<number, string> = {
+  1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5',
+};
+
+/** Shown until the API says which providers it can actually serve. */
+const OPTIMISTIC: Provider[] = ['google', 'facebook', 'instagram', 'twitch'];
 
 export function SocialButtons({ label = 'or continue with' }: { label?: string }) {
-  const [loading, setLoading] = useState<Provider | null>(null);
+  const [loading, setLoading]   = useState<Provider | null>(null);
+  const [enabled, setEnabled]   = useState<Provider[]>(OPTIMISTIC);
+
+  // A provider without configured credentials returns 503 from the URL route,
+  // so rendering its button would advertise a dead end. Ask the API which
+  // ones are live rather than hard-coding a list that drifts from the deploy.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = unwrap<{ id: Provider }[]>(await api.get('/auth/social/providers'));
+        if (!cancelled && list.length) setEnabled(list.map((p) => p.id));
+      } catch {
+        // Keep the optimistic set — a failed probe is not a reason to strip
+        // the sign-in options off the page.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const start = async (provider: Provider) => {
     setLoading(provider);
     try {
-      const data = unwrap<{ authUrl: string; state: string }>(await api.get(`/auth/social/${provider}/url`));
-      sessionStorage.setItem('oauth_state', data.state);
-      sessionStorage.setItem('oauth_provider', provider);
+      // The API records the state server-side and verifies it in the
+      // callback, so there is nothing for the browser to remember here. The
+      // old sessionStorage round-trip could not survive the provider
+      // redirecting to a different origin anyway.
+      const data = unwrap<{ authUrl: string }>(await api.get(`/auth/social/${provider}/url`));
       window.location.href = data.authUrl;
     } catch (err) {
-      toast.error(getApiError(err, `${provider} sign-in unavailable`));
+      toast.error(getApiError(err, `${PROVIDERS[provider].label} sign-in unavailable`));
       setLoading(null);
     }
   };
 
+  if (!enabled.length) return null;
+
   return (
     <div className="space-y-4">
       <p className="text-center text-sm text-muted">{label}</p>
-      <div className="grid grid-cols-4 gap-3">
-        {PROVIDERS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => start(p.id)}
-            disabled={loading !== null}
-            className="h-14 rounded-xl flex items-center justify-center transition hover:scale-105 border border-white/10 hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: p.bg }}
-            aria-label={p.label}
-            title={`Continue with ${p.label}`}
-          >
-            {loading === p.id ? (
-              <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-            ) : (
-              <p.Icon size={24} />
-            )}
-          </button>
-        ))}
+      {/* Written out rather than interpolated: Tailwind scans source text for
+          complete class names, so `'grid-cols-' + n` compiles to nothing and
+          the buttons stack in one column. */}
+      <div className={`grid gap-3 ${GRID_COLS[Math.min(enabled.length, 5)] ?? 'grid-cols-4'}`}>
+        {enabled.map((id) => {
+          const p = PROVIDERS[id];
+          if (!p) return null;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => start(id)}
+              disabled={loading !== null}
+              className="h-14 rounded-xl flex items-center justify-center transition hover:scale-105 border border-white/10 hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: p.bg }}
+              aria-label={`Continue with ${p.label}`}
+              title={`Continue with ${p.label}`}
+            >
+              {loading === id ? (
+                <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+              ) : (
+                <p.Icon size={24} />
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

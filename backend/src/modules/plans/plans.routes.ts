@@ -6,6 +6,7 @@ import { sendSuccess } from '../../utils/response';
 import { supabaseAdmin } from '../../config/supabase';
 import { PlansService, PLAN_LIMITS, buildUpgradePopup } from './plans.service';
 import { AppError } from '../../utils/errors';
+import { PREMIUM_PRICING_PUBLIC, nairaFmt, WAITLIST_DISCOUNT_MONTHS, WAITLIST_DISCOUNT_PCT } from '../../config/pricing';
 
 const plansSvc = new PlansService();
 
@@ -59,8 +60,11 @@ Returns everything the frontend needs to:
     const plans = Object.entries(PLAN_LIMITS).map(([plan, limits]) => ({
       plan,
       ...limits,
+      // Annual carries no savings badge: it is twelve monthly payments taken
+      // at once, priced identically. The previous `savingsPct: 17` was quoting
+      // a discount that does not exist.
       pricing: plan === 'premium'
-        ? { monthly: { amount: 500000, formatted: '₦5,000/mo' }, annual: { amount: 5000000, formatted: '₦50,000/yr', savingsPct: 17 } }
+        ? { monthly: PREMIUM_PRICING_PUBLIC.monthly, annual: PREMIUM_PRICING_PUBLIC.annual }
         : { monthly: null, annual: null },
     }));
     // Derived entirely from a compile-time constant — identical for every
@@ -73,12 +77,24 @@ Returns everything the frontend needs to:
 
   /**
    * POST /plans/apply-discount
-   * Apply a discount code (waitlist reward or promo).
+   * Check a discount code and describe what it is worth. Read-only.
+   *
+   * The name is kept for the clients already calling it, but the behaviour is
+   * corrected: this used to set `is_used: true` while granting absolutely
+   * nothing — no discount was applied to any charge anywhere — so a waitlist
+   * member who pasted their code here destroyed the reward and then paid full
+   * price. It also wrote `user_id: u.id` onto the row, which let any caller
+   * claim a code belonging to someone else simply by knowing it.
+   *
+   * A code is now consumed in exactly one place per type: the Paystack
+   * `charge.success` handler for percentage codes, and `/billing/redeem-code`
+   * for free-month codes. Both consume it only when the benefit is actually
+   * delivered.
    */
   fastify.post('/apply-discount', {
     schema: {
       tags: ['Plans'],
-      summary: 'Apply a discount code — waitlist reward or promo',
+      summary: 'Check a discount code and preview its value — does not consume the code',
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object', required: ['code'],
@@ -97,21 +113,22 @@ Returns everything the frontend needs to:
 
     if (!discount) throw new AppError('Invalid discount code', 404, 'INVALID_CODE');
     if (discount.is_used) throw new AppError('This discount code has already been used', 409, 'CODE_USED');
-    if (discount.user_id && discount.user_id !== u.id) throw new AppError('This code is not valid for your account', 403);
+    // Codes are bound to a user when minted, so an unowned code is not a
+    // public one — it is one nobody is entitled to spend.
+    if (discount.user_id !== u.id) throw new AppError('This code is not valid for your account', 403);
     if (new Date(discount.expires_at) < new Date()) throw new AppError('This discount code has expired', 410, 'CODE_EXPIRED');
 
-    // Mark as used and assign to user
-    await supabaseAdmin.from('discount_codes').update({
-      is_used: true, used_at: new Date().toISOString(), user_id: u.id,
-    }).eq('id', discount.id);
+    const pct = discount.discount_pct ?? WAITLIST_DISCOUNT_PCT;
 
     sendSuccess(reply, {
+      code:         discount.code,
       discountType: discount.discount_type,
-      discountPct:  discount.discount_pct,
+      discountPct:  pct,
       freeMonths:   discount.free_months,
+      expiresAt:    discount.expires_at,
       message:      discount.discount_type === 'first_month_free'
-        ? 'Your first month is free — use this code at checkout.'
-        : `${discount.discount_pct}% off your first 6 months — apply at checkout.`,
-    }, 'Discount code applied');
+        ? 'Your first month is free — redeem it from your billing page.'
+        : `${pct}% off your first ${WAITLIST_DISCOUNT_MONTHS} months — enter this code at checkout.`,
+    }, 'Discount code is valid');
   });
 }

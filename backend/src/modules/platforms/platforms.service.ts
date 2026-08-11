@@ -145,6 +145,11 @@ export class PlatformsService {
 
     return {
       liveChatId: broadcast.data?.snippet?.liveChatId as string | undefined,
+      // The liveBroadcast id is also the watch-page video id, which is what
+      // videos.list wants in order to report concurrentViewers while the
+      // broadcast runs and viewCount after it ends. Returned under the same
+      // name Facebook uses so callers have one field to read, not two.
+      liveVideoId: broadcast.data?.id as string | undefined,
       rtmpUrl:    RTMP_ENDPOINTS.youtube!,
       streamKey:  stream.data?.cdn?.ingestionInfo?.streamName as string | undefined,
     };

@@ -9,9 +9,16 @@
  *    → { accessToken, refreshToken, isNewUser }
  *
  *  Path B — Social OAuth (Google, Facebook, Instagram, TikTok, Twitch)
- *    1. GET  /auth/social/:provider/url  → redirectUrl
- *    2. POST /auth/social/:provider      { code } (after OAuth redirect)
- *    → { accessToken, refreshToken, isNewUser }
+ *    1. GET /auth/social/:provider/url       → { authUrl, state }
+ *    2. Provider redirects the browser to
+ *       GET /auth/social/:provider/callback  ?code&state
+ *    3. That handler redirects to the frontend with a one-time ticket, which
+ *       the frontend trades at POST /auth/social/exchange for the token pair.
+ *    → { accessToken, refreshToken, isNewUser, needsEmail }
+ *
+ *    Tokens travel via a ticket rather than in the redirect URL itself: a URL
+ *    carrying a JWT lands in browser history, the Referer header and any
+ *    proxy log between here and the user.
  *
  *  After either path, isNewUser === true triggers the 3-step onboarding flow:
  *    Step 1: POST /users/onboarding/profile   { full_name, dob, location }
@@ -26,12 +33,25 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '../../config/supabase';
 import { redis, REDIS_KEYS } from '../../config/redis';
 import { env } from '../../config/env';
-import { generateOtp, hashOtp, safeCompare, sha256 } from '../../utils/crypto';
+import { generateOtp, generateToken, hashOtp, safeCompare, sha256 } from '../../utils/crypto';
+import { SOCIAL_PROVIDERS, isProviderConfigured, type SocialProvider, type SocialProfile } from './social-providers';
 import { UnauthorizedError, TooManyRequestsError, AppError } from '../../utils/errors';
 import type { TokenPair, Plan } from '../../types/database';
 import { EmailService } from '../email/email.service';
 
 const emailSvc = new EmailService();
+
+/** How long a user has to complete the provider's consent screen. */
+const OAUTH_STATE_TTL_SECONDS = 600;
+
+/** Long enough for one redirect hop, short enough that a leaked ticket is worthless. */
+const OAUTH_TICKET_TTL_SECONDS = 120;
+
+export interface SocialSignInResult extends TokenPair {
+  isNewUser:  boolean;
+  /** Provider disclosed no email — onboarding must collect one. */
+  needsEmail: boolean;
+}
 
 // ── Device fingerprint from request metadata ──────────────────────
 function deviceFingerprint(userAgent: string, ip: string): string {
@@ -180,52 +200,19 @@ export class AuthService {
   // ══════════════════════════════════════════════════════════════
 
   /**
-   * Returns the OAuth redirect URL for a given provider.
-   * Frontend redirects user to this URL. Provider redirects back with ?code=...
+   * Builds the provider's authorize URL. The frontend sends the browser here;
+   * the provider redirects back to our own callback with ?code & ?state.
    */
-  getSocialOAuthUrl(
-    provider: 'google' | 'facebook' | 'instagram' | 'tiktok' | 'twitch',
-    state: string
-  ): string {
-    const configs: Record<string, { authUrl: string; clientId: string; redirectUri: string; scopes: string[]; extra?: Record<string, string> }> = {
-      google: {
-        authUrl:     'https://accounts.google.com/o/oauth2/v2/auth',
-        clientId:    env.YOUTUBE_CLIENT_ID,
-        redirectUri: `${env.API_BASE_URL}/api/v1/auth/social/google/callback`,
-        scopes:      ['openid', 'profile', 'email'],
-        extra:       { access_type: 'offline', prompt: 'consent' },
-      },
-      facebook: {
-        authUrl:     'https://www.facebook.com/v19.0/dialog/oauth',
-        clientId:    env.META_APP_ID,
-        redirectUri: `${env.API_BASE_URL}/api/v1/auth/social/facebook/callback`,
-        scopes:      ['email', 'public_profile'],
-      },
-      instagram: {
-        authUrl:     'https://api.instagram.com/oauth/authorize',
-        clientId:    env.META_APP_ID,
-        redirectUri: `${env.API_BASE_URL}/api/v1/auth/social/instagram/callback`,
-        scopes:      ['user_profile', 'user_media'],
-      },
-      tiktok: {
-        authUrl:     'https://www.tiktok.com/auth/authorize/',
-        clientId:    env.TIKTOK_CLIENT_KEY,
-        redirectUri: `${env.API_BASE_URL}/api/v1/auth/social/tiktok/callback`,
-        scopes:      ['user.info.basic'],
-      },
-      twitch: {
-        authUrl:     'https://id.twitch.tv/oauth2/authorize',
-        clientId:    env.TWITCH_CLIENT_ID,
-        redirectUri: `${env.API_BASE_URL}/api/v1/auth/social/twitch/callback`,
-        scopes:      ['user:read:email'],
-      },
-    };
-
-    const cfg = configs[provider];
+  getSocialOAuthUrl(provider: SocialProvider, state: string): string {
+    const cfg = SOCIAL_PROVIDERS[provider];
     if (!cfg) throw new AppError(`Unsupported provider: ${provider}`, 400);
+    if (!isProviderConfigured(provider)) {
+      throw new AppError(`${provider} sign-in is not available right now.`, 503, 'PROVIDER_UNCONFIGURED');
+    }
 
     const params = new URLSearchParams({
-      client_id:     cfg.clientId,
+      // TikTok names this parameter `client_key`; everyone else `client_id`.
+      [cfg.clientIdParam ?? 'client_id']: cfg.clientId,
       redirect_uri:  cfg.redirectUri,
       response_type: 'code',
       scope:         cfg.scopes.join(' '),
@@ -237,65 +224,334 @@ export class AuthService {
   }
 
   /**
-   * Exchange OAuth code for OmliveStream tokens.
-   * Called from the frontend after the provider redirects with ?code=...
+   * Verifies the state parameter and consumes it.
+   *
+   * State is single-use: a replayed callback must not mint a second session,
+   * and the delete is what makes the code exchange below un-replayable too.
+   * Returns the provider the flow was started for, so a code obtained under
+   * one provider cannot be redeemed against another.
+   */
+  async consumeOAuthState(state: string): Promise<{ provider: SocialProvider | null }> {
+    const key = REDIS_KEYS.OAUTH_STATE_V2(state);
+    const raw = await redis.get<string>(key);
+    if (!raw) throw new UnauthorizedError('This sign-in link has expired. Please try again.');
+    await redis.del(key);
+
+    // Older states were stored as the bare string "1" with no provider. Treat
+    // those as valid-but-unattributed rather than rejecting mid-deploy.
+    try {
+      const parsed = JSON.parse(raw) as { provider?: SocialProvider };
+      return { provider: parsed.provider ?? null };
+    } catch {
+      return { provider: null };
+    }
+  }
+
+  /** Records a freshly-minted state so the callback can verify it. */
+  async issueOAuthState(provider: SocialProvider): Promise<string> {
+    const state = generateToken(16);
+    await redis.set(
+      REDIS_KEYS.OAUTH_STATE_V2(state),
+      JSON.stringify({ provider, at: Date.now() }),
+      { ex: OAUTH_STATE_TTL_SECONDS },
+    );
+    return state;
+  }
+
+  /**
+   * Exchanges the authorization code for our own tokens.
+   *
+   * This used to call `supabaseAdmin.auth.exchangeCodeForSession(code)`, which
+   * only redeems codes Supabase itself issued through its own OAuth proxy. The
+   * authorize URL above is built against our client ids, so the code always
+   * came from the provider directly and the exchange could never succeed —
+   * social sign-in returned "Could not authenticate" for every provider. The
+   * exchange now goes to the provider's own token endpoint.
    */
   async handleSocialOAuth(
-    provider: 'google' | 'facebook' | 'instagram' | 'tiktok' | 'twitch',
+    provider: SocialProvider,
     code: string,
     ip: string,
-    userAgent: string
-  ): Promise<TokenPair & { isNewUser: boolean }> {
-    // Exchange code for user profile via Supabase Auth (handles token exchange per provider)
-    const { data, error } = await supabaseAdmin.auth.exchangeCodeForSession(code);
+    userAgent: string,
+  ): Promise<SocialSignInResult> {
+    const cfg = SOCIAL_PROVIDERS[provider];
+    if (!cfg) throw new AppError(`Unsupported provider: ${provider}`, 400);
 
-    if (error || !data.user?.email) {
+    let profile: SocialProfile;
+    try {
+      const body = new URLSearchParams({
+        [cfg.clientIdParam ?? 'client_id']: cfg.clientId,
+        client_secret: cfg.clientSecret,
+        code,
+        grant_type:    'authorization_code',
+        redirect_uri:  cfg.redirectUri,
+      });
+
+      const res = await fetch(cfg.tokenUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        body,
+      });
+      const payload = await res.json() as Record<string, any>;
+      if (!res.ok) throw new Error(`token endpoint ${res.status}: ${JSON.stringify(payload).slice(0, 200)}`);
+
+      // TikTok v2 nests the token one level down; the rest return it flat.
+      const accessToken = payload.access_token ?? payload.data?.access_token;
+      if (!accessToken) throw new Error('no access_token in token response');
+
+      profile = await cfg.fetchProfile(accessToken, payload);
+    } catch (err) {
+      // The provider's own message is not safe to surface — it can echo the
+      // client secret back in an error string.
+      logger.error({ err, provider }, 'social oauth exchange failed');
       throw new UnauthorizedError(
-        `Could not authenticate with ${provider}. Please try again or use email sign-in.`
+        `Could not sign you in with ${provider}. Please try again or use email sign-in.`,
       );
     }
 
-    const email    = data.user.email;
-    const fullName = (data.user.user_metadata?.full_name ?? data.user.user_metadata?.name ?? '') as string;
-    const avatar   = (data.user.user_metadata?.avatar_url ?? data.user.user_metadata?.picture ?? null) as string | null;
+    if (!profile.providerId) {
+      throw new UnauthorizedError(`${provider} did not return an account id. Please use email sign-in.`);
+    }
 
-    // Upsert user
-    let { data: user } = await supabaseAdmin
-      .from('users').select('id,email,plan,is_verified,status').eq('email', email).maybeSingle();
+    return this.upsertSocialUser(provider, profile, ip, userAgent);
+  }
 
+  /**
+   * Finds or creates the account behind a social profile, then issues tokens.
+   *
+   * Matching is by provider identity first and email second. Instagram and
+   * TikTok return no email at all, and Facebook omits it for phone-only
+   * accounts, so an email-only lookup would create a duplicate account on
+   * every one of that user's subsequent sign-ins.
+   */
+  private async upsertSocialUser(
+    provider: SocialProvider,
+    profile: SocialProfile,
+    ip: string,
+    userAgent: string,
+  ): Promise<SocialSignInResult> {
+    type UserRow = { id: string; email: string; plan: string; is_verified: boolean; status?: string };
+
+    const { data: linked } = await supabaseAdmin
+      .from('social_identities')
+      .select('user_id')
+      .eq('provider', provider)
+      .eq('provider_user_id', profile.providerId)
+      .maybeSingle();
+
+    let user: UserRow | null = null;
     let isNewUser = false;
+
+    if (linked?.user_id) {
+      const { data } = await supabaseAdmin
+        .from('users').select('id,email,plan,is_verified,status').eq('id', linked.user_id).maybeSingle();
+      user = data as UserRow | null;
+    }
+
+    // Fall back to email only when the provider vouched for it. A provider
+    // that hands back an unverified address would otherwise be a way to take
+    // over any account by registering that address on the provider's side.
+    if (!user && profile.email) {
+      const { data } = await supabaseAdmin
+        .from('users').select('id,email,plan,is_verified,status')
+        .eq('email', profile.email.toLowerCase()).maybeSingle();
+      user = data as UserRow | null;
+    }
+
     if (!user) {
+      // A placeholder address keeps the NOT NULL + UNIQUE constraint on
+      // users.email satisfied for providers that never disclose one. It is
+      // flagged by `needsEmail` so onboarding collects a real address, and it
+      // is unroutable by construction so nothing is ever mailed into the void.
+      const email = profile.email?.toLowerCase()
+        ?? `${provider}_${profile.providerId}@social.omlivestream.invalid`;
+
       const { data: created, error: ce } = await supabaseAdmin
         .from('users')
         .insert({
-          id: uuidv4(), email,
-          full_name:        fullName || null,
-          avatar_url:       avatar,
+          id: uuidv4(),
+          email,
+          full_name:        profile.fullName,
+          avatar_url:       profile.avatarUrl,
           plan:             'free_trial',
-          is_verified:      true,
+          // Verified only when the provider actually confirmed an address.
+          is_verified:      Boolean(profile.email),
           status:           'active',
           trial_started_at: new Date().toISOString(),
           trial_expires_at: new Date(Date.now() + 90 * 86_400_000).toISOString(),
         })
-        .select('id,email,plan,is_verified,status').single();
-      if (ce || !created) throw new AppError('Failed to create account', 500);
-      user = created;
+        .select('id,email,plan,is_verified,status')
+        .single();
+
+      if (ce || !created) {
+        logger.error({ err: ce, provider }, 'social signup insert failed');
+        throw new AppError('Failed to create account', 500);
+      }
+
+      user      = created as UserRow;
       isNewUser = true;
-      await emailSvc.sendWelcomeEmail(email);
-      try {
-        const { WaitlistService } = await import('../waitlist/waitlist.service');
-        await new WaitlistService().grantWaitlistReward(email, user!.id);
-      } catch { /* non-fatal */ }
     }
 
-    const u2 = user!;
-    if (u2.status === 'banned')    throw new UnauthorizedError('Account banned. Contact support@omlivestream.com');
-    if (u2.status === 'suspended') throw new UnauthorizedError('Account suspended. Contact support@omlivestream.com');
+    const u = user!;
+    if (u.status === 'banned')    throw new UnauthorizedError(`Account banned. Contact ${env.SUPPORT_EMAIL}`);
+    if (u.status === 'suspended') throw new UnauthorizedError(`Account suspended. Contact ${env.SUPPORT_EMAIL}`);
 
-    const tokens = await this.issueTokens(u2.id, u2.email, u2.plan as Plan, ip, userAgent);
-    await this.trackLogin(u2.id, u2.email, ip, userAgent, isNewUser);
+    // Link the identity for next time. Idempotent on (provider, provider_user_id).
+    await supabaseAdmin.from('social_identities').upsert({
+      provider,
+      provider_user_id: profile.providerId,
+      user_id:          u.id,
+      email:            profile.email,
+      last_login_at:    new Date().toISOString(),
+    }, { onConflict: 'provider,provider_user_id' });
 
-    return { ...tokens, isNewUser };
+    const needsEmail = u.email.endsWith('.invalid');
+
+    if (isNewUser) {
+      if (!needsEmail) {
+        await emailSvc.sendWelcomeEmail(u.email).catch(() => { /* non-fatal */ });
+        try {
+          const { WaitlistService } = await import('../waitlist/waitlist.service');
+          await new WaitlistService().grantWaitlistReward(u.email, u.id);
+        } catch { /* non-fatal */ }
+      }
+      // When the address is a placeholder, the welcome mail and the waitlist
+      // reward both wait for onboarding to collect the real one — matching on
+      // a synthetic address would never find a waitlist entry anyway.
+    }
+
+    const tokens = await this.issueTokens(u.id, u.email, u.plan as Plan, ip, userAgent);
+    await this.trackLogin(u.id, u.email, ip, userAgent, isNewUser);
+
+    return { ...tokens, isNewUser, needsEmail };
+  }
+
+  /**
+   * Parks a completed sign-in behind a short-lived, single-use ticket.
+   *
+   * The provider redirect lands on the API, but the tokens belong in the
+   * browser's localStorage on the frontend origin. Putting them in the
+   * redirect URL would write a refresh token into browser history, the
+   * Referer header of the next request, and every proxy log in between. The
+   * ticket is a random opaque id with a 2-minute life that buys exactly one
+   * token pair.
+   */
+  async parkSocialResult(result: SocialSignInResult): Promise<string> {
+    const ticket = generateToken(24);
+    await redis.set(`oauth:ticket:${ticket}`, JSON.stringify(result), { ex: OAUTH_TICKET_TTL_SECONDS });
+    return ticket;
+  }
+
+  /** Redeems a ticket exactly once. */
+  async redeemSocialTicket(ticket: string): Promise<SocialSignInResult> {
+    const key = `oauth:ticket:${ticket}`;
+    const raw = await redis.get<string>(key);
+    if (!raw) throw new UnauthorizedError('This sign-in has expired. Please try again.');
+    await redis.del(key);
+    return JSON.parse(raw) as SocialSignInResult;
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  //  CLAIMING A REAL EMAIL AFTER A SOCIAL SIGN-IN
+  // ══════════════════════════════════════════════════════════════
+  //
+  // Instagram and TikTok disclose no email at any scope, and Facebook omits
+  // it for phone-only accounts. Those accounts are created against a
+  // placeholder `@social.omlivestream.invalid` address so the NOT NULL +
+  // UNIQUE constraint on users.email still holds. Nothing can be mailed to
+  // them — not the OTP fallback, not a receipt, not a password-free login
+  // link — until a real address is attached here.
+  //
+  // The address is verified with the same OTP machinery as email sign-in
+  // rather than simply accepted: an unverified address on file is worse than
+  // a placeholder, because it silently claims a mailbox the user may not own
+  // and becomes a login route into their account.
+
+  /** Sends a verification code to an address the user wants to attach. */
+  async requestEmailClaim(userId: string, email: string): Promise<{ message: string }> {
+    const normalised = email.toLowerCase().trim();
+
+    const rateKey = REDIS_KEYS.OTP_RATE(`claim:${userId}`);
+    const count   = await redis.incr(rateKey);
+    if (count === 1) await redis.expire(rateKey, 3600);
+    if (count > env.RATE_LIMIT_AUTH_MAX) {
+      throw new TooManyRequestsError('Too many attempts — wait an hour before trying another address.');
+    }
+
+    const { data: taken } = await supabaseAdmin
+      .from('users').select('id').eq('email', normalised).maybeSingle();
+    if (taken && taken.id !== userId) {
+      throw new AppError('That email is already used by another account.', 409, 'EMAIL_TAKEN');
+    }
+
+    await supabaseAdmin.from('otp_codes').delete().eq('user_id', userId).is('used_at', null);
+
+    const otp = generateOtp(6);
+    await supabaseAdmin.from('otp_codes').insert({
+      id: uuidv4(), user_id: userId, code_hash: hashOtp(otp),
+      type: 'login', attempts: 0,
+      expires_at: new Date(Date.now() + env.OTP_EXPIRY_MINUTES * 60_000).toISOString(),
+      used_at: null,
+    });
+
+    // Sent to the address being claimed, not to the one on file — the one on
+    // file is the placeholder and is undeliverable by design.
+    await emailSvc.sendOtpEmail(normalised, otp, false);
+
+    // Held in Redis, not in the OTP row, so a code intercepted for one
+    // address cannot be redeemed against a different one.
+    await redis.set(`email:claim:${userId}`, normalised, { ex: env.OTP_EXPIRY_MINUTES * 60 });
+
+    return { message: `A ${env.OTP_EXPIRY_MINUTES}-minute verification code has been sent to ${normalised}` };
+  }
+
+  /** Confirms the code and swaps the placeholder address for the real one. */
+  async confirmEmailClaim(userId: string, code: string): Promise<{ email: string }> {
+    const pending = await redis.get<string>(`email:claim:${userId}`);
+    if (!pending) throw new UnauthorizedError('That code has expired — request a new one.');
+
+    const { data: otp } = await supabaseAdmin
+      .from('otp_codes').select('*').eq('user_id', userId).is('used_at', null)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+
+    if (!otp) throw new UnauthorizedError('No active code — request a new one.');
+    if (new Date(otp.expires_at) < new Date()) throw new UnauthorizedError('Code expired — request a new one.');
+    if (otp.attempts >= env.OTP_MAX_ATTEMPTS) {
+      await supabaseAdmin.from('otp_codes').delete().eq('id', otp.id);
+      throw new TooManyRequestsError('Too many wrong attempts — request a new code.');
+    }
+    if (!safeCompare(hashOtp(code), otp.code_hash)) {
+      await supabaseAdmin.from('otp_codes').update({ attempts: otp.attempts + 1 }).eq('id', otp.id);
+      const remaining = env.OTP_MAX_ATTEMPTS - (otp.attempts + 1);
+      throw new UnauthorizedError(`Incorrect code — ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining`);
+    }
+
+    await supabaseAdmin.from('otp_codes').update({ used_at: new Date().toISOString() }).eq('id', otp.id);
+
+    // Re-checked immediately before the write: the address was free when the
+    // code was sent, but an OTP window is minutes long and an email sign-up
+    // in between would otherwise collide with the unique constraint.
+    const { data: taken } = await supabaseAdmin
+      .from('users').select('id').eq('email', pending).maybeSingle();
+    if (taken && taken.id !== userId) {
+      throw new AppError('That email was just claimed by another account.', 409, 'EMAIL_TAKEN');
+    }
+
+    const { error } = await supabaseAdmin
+      .from('users').update({ email: pending, is_verified: true }).eq('id', userId);
+    if (error) throw new AppError('Could not save that email address.', 500);
+
+    await redis.del(`email:claim:${userId}`);
+
+    // Deferred from signup: both were skipped while the address was a
+    // placeholder, since a waitlist entry can only ever match a real one.
+    await emailSvc.sendWelcomeEmail(pending).catch(() => { /* non-fatal */ });
+    try {
+      const { WaitlistService } = await import('../waitlist/waitlist.service');
+      await new WaitlistService().grantWaitlistReward(pending, userId);
+    } catch { /* non-fatal */ }
+
+    return { email: pending };
   }
 
   // ══════════════════════════════════════════════════════════════

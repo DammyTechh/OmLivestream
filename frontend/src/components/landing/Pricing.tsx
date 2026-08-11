@@ -2,11 +2,12 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
+import { PREMIUM_PRICE, naira } from '@/lib/pricing';
 
 const FREE_FEATURES = [
   'Access to a maximum of 2 streaming platforms',
   'Ability to go live and stream content',
-  'View impressions and basic statistics',
+  'View viewer counts and basic statistics',
   'View comments in read-only mode (replies not available)',
   'Advanced video editing and customization tools are not included',
 ];
@@ -79,12 +80,15 @@ export function Pricing() {
           >
             <h3 className="font-display text-2xl font-semibold mb-4">Premium</h3>
             <div className="mb-3">
-              <span className="font-display text-5xl font-semibold tracking-tight">₦15,000</span>
+              <span className="font-display text-5xl font-semibold tracking-tight">{naira(PREMIUM_PRICE.monthly)}</span>
               <span className="text-muted text-lg">/month</span>
             </div>
-            <div className="mb-5 flex items-baseline gap-2">
-              <span className="text-text/70 line-through">₦153,000<span className="text-sm">/year</span></span>
-              <span className="text-success text-sm">(15% off)</span>
+            {/* No strikethrough, no savings badge: annual is twelve monthly
+                payments taken at once, at the same rate. The old "₦153,000
+                (15% off)" advertised a discount nothing in the codebase
+                applied. */}
+            <div className="mb-5">
+              <span className="text-muted text-sm">or {naira(PREMIUM_PRICE.annual)}/year — billed annually</span>
             </div>
             <p className="text-[15px] text-text/90 mb-8 font-medium">Scale your influence with full engagement and pro-level customization.</p>
 

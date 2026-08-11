@@ -7,6 +7,7 @@ import { stopAllBroadcasts } from './modules/webrtc/broadcast.service';
 import { initSocketIO, closeSocketAdapter } from './websocket/socket';
 import { commentIngestion }  from './websocket/comment-ingestion.service';
 import { flushAllComments }  from './modules/streams/comment-buffer';
+import { stopAllSampling }   from './modules/streams/metrics-sampler';
 import { startCronJobs }     from './jobs/crons';
 
 async function main(): Promise<void> {
@@ -59,6 +60,12 @@ async function main(): Promise<void> {
     // Clear the chat pollers' timers so nothing keeps the event loop alive
     // and no in-flight poll resolves against a closing process.
     commentIngestion.stopAll();
+
+    // Same for the metrics samplers. Synchronous and deliberately without a
+    // rollup: that would add two outbound HTTPS calls per platform per live
+    // stream to a shutdown already waiting on ffmpeg. The samples already
+    // written survive, and the stream's own end() rolls up when it runs.
+    stopAllSampling();
 
     // Then write out whatever they had buffered. Order matters: stopping the
     // pollers first means nothing can arrive after the flush and be lost.

@@ -5,10 +5,11 @@ import { Gift, X, ArrowRight, Copy, Check } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { WAITLIST_DISCOUNT_PCT, WAITLIST_DISCOUNT_MONTHS } from '@/lib/pricing';
 
 interface DiscountCode {
   code: string;
-  discount_type: 'first_month_free' | 'six_month_50pct';
+  discount_type: 'first_month_free' | 'six_month_pct';
   discount_pct: number | null;
   free_months: number | null;
   is_used: boolean;
@@ -59,7 +60,7 @@ export function WaitlistOfferPopup() {
   const labelFor = (c: DiscountCode) =>
     c.discount_type === 'first_month_free'
       ? 'One month free'
-      : `${c.discount_pct}% off your first 6 months`;
+      : `${c.discount_pct ?? WAITLIST_DISCOUNT_PCT}% off your first ${WAITLIST_DISCOUNT_MONTHS} months`;
 
   return (
     <AnimatePresence>
@@ -142,9 +143,14 @@ export function WaitlistOfferPopup() {
               Go to Billing to redeem <ArrowRight size={14} />
             </Link>
 
-            <p className="text-center text-[11px] text-subtle mt-2">
-              Expires {new Date(codes[0]?.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </p>
+            {/* Guarded: `codes` is [] on the first render after a fetch that
+                returned nothing, and `new Date(undefined)` renders the string
+                "Invalid Date" straight into the popup. */}
+            {codes[0]?.expires_at && (
+              <p className="text-center text-[11px] text-subtle mt-2">
+                Expires {new Date(codes[0].expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </p>
+            )}
           </motion.div>
         </>
       )}

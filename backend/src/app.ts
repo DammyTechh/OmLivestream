@@ -29,6 +29,7 @@ import { waitlistRoutes }   from './modules/waitlist/waitlist.routes';
 import { webrtcRoutes }     from './modules/webrtc/webrtc.routes';
 import { aiRoutes }         from './modules/ai/ai.routes';
 import { contactRoutes }    from './modules/contact/contact.routes';
+import { notificationsRoutes } from './modules/notifications/notifications.routes';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -216,7 +217,7 @@ Multi-platform live streaming SaaS backend — stream to 8+ platforms simultaneo
         { name: 'Streams',    description: 'Stream lifecycle — create, start, end' },
         { name: 'WebRTC',     description: 'mediasoup transport + producer — required before going live' },
         { name: 'Recordings', description: 'Auto-saved recordings, AI editing, platform publishing' },
-        { name: 'Analytics',  description: 'Views, impressions and engagement metrics' },
+        { name: 'Analytics',  description: 'Views, peak audience and engagement metrics' },
         { name: 'Billing',    description: 'Paystack subscriptions, invoices, webhooks' },
         { name: 'AI',         description: 'AI assistant chat and stream title generator' },
         { name: 'Feedback',   description: 'User feedback and feature update notifications' },
@@ -302,6 +303,7 @@ Multi-platform live streaming SaaS backend — stream to 8+ platforms simultaneo
     await v1.register(plansRoutes,      { prefix: '/plans' });
     await v1.register(waitlistRoutes,   { prefix: '/waitlist' });
     await v1.register(contactRoutes,    { prefix: '/contact' });
+    await v1.register(notificationsRoutes, { prefix: '/notifications' });
   }, { prefix: '/api/v1' });
 
   return app;

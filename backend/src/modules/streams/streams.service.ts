@@ -8,12 +8,14 @@ import { createRouter, closeRouter } from '../webrtc/webrtc.service';
 import { startBroadcast, stopBroadcast } from '../webrtc/broadcast.service';
 import { analyseNetwork, type NetworkTestResult } from './network.service';
 import { bufferComment, flushComments } from './comment-buffer';
+import { startSampling, stopSampling, noteComment } from './metrics-sampler';
 import type { Platform, StreamStatus } from '../../types/database';
 
 import { PlansService } from '../plans/plans.service';
 import { PlatformReplyService } from '../../websocket/platform-reply.service';
 import { commentIngestion } from '../../websocket/comment-ingestion.service';
 import { getIO, broadcastComment } from '../../websocket/socket';
+import { notifications } from '../notifications/notifications.service';
 
 const platformsSvc = new PlatformsService();
 const plansSvc     = new PlansService();
@@ -67,7 +69,11 @@ export class StreamsService {
     await supabaseAdmin.from('stream_platforms').insert(
       payload.platforms.map(p => ({
         id: uuidv4(), stream_id: stream.id, platform: p,
-        rtmp_push_status: 'pending', viewers_peak: 0, impressions: 0, total_comments: 0,
+        // viewers_peak and total_comments are counters the metrics sampler
+        // maintains as the broadcast runs; both columns default to 0, so
+        // they are left to the schema rather than restated here. impressions
+        // is not written at all — nothing produces it.
+        rtmp_push_status: 'pending',
       }))
     );
 
@@ -261,10 +267,31 @@ export class StreamsService {
     // already pushing video at this point.
     void this.startComments(streamId, userId, refs);
 
+    // Same reasoning for metrics: this reads tokens and makes an outbound
+    // call per platform, and a stream we cannot measure must still go out.
+    void startSampling({ streamId, userId, refs }).catch((err) =>
+      logger.error({ err, streamId }, 'Metrics sampling failed to start'));
+
     logger.info(
       { streamId, platforms: targets.length, videoCopied: result.videoCopied },
       'Broadcast live'
     );
+
+    // Raised here rather than in start(), because start() only hands the
+    // browser its RTP capabilities — at that point nothing has reached a
+    // platform and a "you're live" notification would be a lie.
+    //
+    // Not awaited: the response the client is waiting on carries the encoder
+    // parameters it needs, and must not queue behind a notification insert.
+    void notifications.notify({
+      userId,
+      type:  'stream',
+      title: 'You are live',
+      body:  failed.length
+        ? `${stream.title ?? 'Your stream'} is live on ${targets.length} platform${targets.length === 1 ? '' : 's'}. ${failed.length} could not be reached: ${failed.join(', ')}.`
+        : `${stream.title ?? 'Your stream'} is live on ${targets.length} platform${targets.length === 1 ? '' : 's'}.`,
+      link:  `/dashboard/streams/${streamId}`,
+    });
 
     return result;
   }
@@ -309,6 +336,12 @@ export class StreamsService {
           }
 
           bufferComment(row);
+
+          // Counts toward the current metrics sample. Cheap here because
+          // this callback already sees every comment exactly once; the
+          // alternative was a count query per platform per sample against
+          // the largest table in the schema.
+          noteComment(streamId, c.platform);
         },
       });
     } catch (err) {
@@ -329,6 +362,12 @@ export class StreamsService {
     await stopBroadcast(streamId);
     commentIngestion.stop(streamId);
     closeRouter(streamId);
+
+    // After the pollers are stopped, so no comment can be counted into a
+    // window that has already been rolled up. Awaited because the rollup
+    // reads the platforms' final view counts, and those ids die with the
+    // sampler.
+    await stopSampling(streamId);
 
     const endedAt = new Date().toISOString();
     // Three independent writes plus the final comment flush. Nothing here
@@ -419,7 +458,25 @@ export class StreamsService {
 
     const target = comment?.reply_target ?? body.commentId;
 
-    await replySvc.sendReply(userId, body.platform, target, body.text);
+    try {
+      await replySvc.sendReply(userId, body.platform, target, body.text);
+    } catch (err) {
+      // A failed reply is worth a notification precisely because the socket
+      // path is fire-and-forget from the user's point of view: they typed
+      // into the chat panel and moved on. Without this, an expired token
+      // silently swallows every reply for the rest of the broadcast.
+      //
+      // Rethrown afterwards so both callers still see the failure — the REST
+      // route turns it into a status code, the socket handler into an event.
+      void notifications.notify({
+        userId,
+        type:  'platform',
+        title: 'Reply not delivered',
+        body:  `${body.platform} rejected your reply. Reconnect the account in Settings if this keeps happening.`,
+        link:  '/dashboard/settings',
+      });
+      throw err;
+    }
 
     if (comment?.id) {
       await supabaseAdmin.from('stream_comments')

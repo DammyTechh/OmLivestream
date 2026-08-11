@@ -97,6 +97,28 @@ const envSchema = z.object({
   LINKEDIN_CLIENT_SECRET: z.string().min(1),
   LINKEDIN_REDIRECT_URI: z.string().url(),
 
+  // ── Sign-in OAuth clients ─────────────────────────────────────────
+  // Separate from the broadcast clients above on purpose. Those hold
+  // publishing scopes (youtube.force-ssl, publish_video) and are reviewed by
+  // the platform as a broadcasting tool; these ask only for a name, email and
+  // avatar. Sharing one client means the sign-in button triggers a consent
+  // screen demanding permission to publish video, which reads as a phishing
+  // attempt and costs conversions — and it couples a routine credential
+  // rotation on one flow to an outage in the other.
+  //
+  // Optional, and each falls back to its broadcast counterpart, so an existing
+  // deployment keeps working unchanged until the dedicated clients exist.
+  AUTH_GOOGLE_CLIENT_ID:        z.string().optional(),
+  AUTH_GOOGLE_CLIENT_SECRET:    z.string().optional(),
+  AUTH_FACEBOOK_CLIENT_ID:      z.string().optional(),
+  AUTH_FACEBOOK_CLIENT_SECRET:  z.string().optional(),
+  AUTH_INSTAGRAM_CLIENT_ID:     z.string().optional(),
+  AUTH_INSTAGRAM_CLIENT_SECRET: z.string().optional(),
+  AUTH_TIKTOK_CLIENT_KEY:       z.string().optional(),
+  AUTH_TIKTOK_CLIENT_SECRET:    z.string().optional(),
+  AUTH_TWITCH_CLIENT_ID:        z.string().optional(),
+  AUTH_TWITCH_CLIENT_SECRET:    z.string().optional(),
+
   OTP_EXPIRY_MINUTES: z.coerce.number().default(10),
   OTP_MAX_ATTEMPTS: z.coerce.number().default(3),
   RATE_LIMIT_AUTH_MAX: z.coerce.number().default(5),

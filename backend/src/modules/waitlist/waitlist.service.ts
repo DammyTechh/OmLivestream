@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '../../config/supabase';
 import { ConflictError, AppError } from '../../utils/errors';
 import { EmailService } from '../email/email.service';
+import { WAITLIST_DISCOUNT_PCT, WAITLIST_DISCOUNT_MONTHS } from '../../config/pricing';
 
 const emailSvc = new EmailService();
 
@@ -53,7 +54,13 @@ export class WaitlistService {
   /**
    * When a waitlist member registers, grant them their rewards:
    *  - 1 month free trial extension (total: 90 + 30 = 120 days trial)
-   *  - Discount code for 50% off first 6 months
+   *  - Discount code for WAITLIST_DISCOUNT_PCT% off the first
+   *    WAITLIST_DISCOUNT_MONTHS months
+   *
+   * This is the only place discount codes are ever minted, and it runs only
+   * when the registering email matches a `waitlist` row. That is what keeps
+   * the offer exclusive: a normal signup never reaches this method, so no
+   * code exists for them to redeem.
    *
    * Called from auth.service after account creation if email matches waitlist.
    */
@@ -80,8 +87,8 @@ export class WaitlistService {
       },
       {
         id: uuidv4(), code: sixMonthCode, user_id: userId,
-        waitlist_id: waitlistEntry.id, discount_type: 'six_month_50pct',
-        free_months: null, discount_pct: 50, is_used: false, expires_at: sixMonthExpiry,
+        waitlist_id: waitlistEntry.id, discount_type: 'six_month_pct',
+        free_months: null, discount_pct: WAITLIST_DISCOUNT_PCT, is_used: false, expires_at: sixMonthExpiry,
       },
     ]);
 

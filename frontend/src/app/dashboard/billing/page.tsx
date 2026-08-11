@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { WAITLIST_DISCOUNT_PCT, WAITLIST_DISCOUNT_MONTHS } from '@/lib/pricing';
 
 interface Invoice {
   id: string;
@@ -84,7 +85,7 @@ function CodeRedeemBox({ onRedeemed }: { onRedeemed: () => void }) {
   };
 
   const isFree     = preview?.discountType === 'first_month_free';
-  const isDiscount = preview?.discountType === 'six_month_50pct';
+  const isDiscount = preview?.discountType === 'six_month_pct';
 
   return (
     <Card className="p-6">
@@ -161,7 +162,7 @@ function CodeRedeemBox({ onRedeemed }: { onRedeemed: () => void }) {
           <p className="text-xs text-muted mt-3 pt-3 border-t border-white/10">
             {isFree
               ? 'This code gives you one month of Premium free — no payment needed. Activate it and your access starts immediately.'
-              : 'This code gives you 50% off for 6 months. It is applied automatically at checkout on the payment page.'}
+              : `This code takes ${preview?.discountPct ?? WAITLIST_DISCOUNT_PCT}% off each of your first ${WAITLIST_DISCOUNT_MONTHS} months. Enter it at checkout on the payment page.`}
           </p>
         </div>
       )}

@@ -40,6 +40,7 @@ import type * as mediasoup from 'mediasoup';
 import { getRouter, getStreamProducers } from './webrtc.service';
 import { supabaseAdmin } from '../../config/supabase';
 import { logger } from '../../config/logger';
+import { notifications } from '../notifications/notifications.service';
 import { AppError } from '../../utils/errors';
 
 const execFileAsync = promisify(execFile);
@@ -181,6 +182,18 @@ async function finaliseRecording(
       .eq('id', recordingId);
 
     logger.info({ streamId, recordingId, durationSeconds, size }, 'Recording finalised');
+
+    // The user has already closed the broadcast tab by now, so this is what
+    // they see on their next visit. An email goes out for AI edits but not
+    // for the raw recording — this is the only surface that tells them the
+    // file from the stream they just finished is downloadable.
+    void notifications.notify({
+      userId,
+      type:  'stream',
+      title: 'Recording ready',
+      body:  `Your recording is processed and ready to download (${Math.round(durationSeconds / 60)} min).`,
+      link:  '/dashboard/recordings',
+    });
   } catch (err) {
     logger.error({ streamId, recordingId, err }, 'Recording upload failed');
     await markRecordingFailed(recordingId);

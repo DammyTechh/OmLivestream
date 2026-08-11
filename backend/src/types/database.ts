@@ -23,7 +23,7 @@ export type LoginRisk      = 'low' | 'medium' | 'high';
 export type BroadcastSegment = 'all' | 'free_trial' | 'free' | 'premium' | 'waitlist_members' | 'inactive';
 export type BroadcastStatus  = 'draft' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'failed';
 export type DeliveryStatus   = 'pending' | 'sent' | 'failed' | 'skipped';
-export type DiscountType     = 'first_month_free' | 'six_month_50pct';
+export type DiscountType     = 'first_month_free' | 'six_month_pct';
 export type ContactStatus    = 'unread' | 'read' | 'replied';
 
 type TableDef<Row extends Record<string, unknown>> = {
@@ -216,6 +216,10 @@ export interface Database {
           current_period_end:         string;
           created_at:                 string;
           updated_at:                 string;
+          /** Billing cycles still owed the waitlist discount — decremented per charge (v10). */
+          discount_cycles_remaining:  number;
+          discount_pct:               number | null;
+          discount_code:              string | null;
         };
         Insert: Omit<Database['public']['Tables']['subscriptions']['Row'], 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['subscriptions']['Insert']>;
@@ -329,6 +333,8 @@ export interface Database {
           used_at:       string | null;
           expires_at:    string;
           created_at:    string;
+          /** Paystack reference that consumed this code — makes redemption idempotent (v10). */
+          redeemed_by_reference: string | null;
         };
         Insert: Omit<Database['public']['Tables']['discount_codes']['Row'], 'created_at'>;
         Update: Partial<Database['public']['Tables']['discount_codes']['Insert']>;
