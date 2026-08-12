@@ -46,14 +46,14 @@ function BroadcastsContent() {
 
   const statusColor = (s: string) => {
     const map: Record<string, string> = {
-      draft:      'bg-white/10 text-muted',
+      draft:      'bg-veil/10 text-muted',
       scheduled:  'bg-primary/15 text-primary',
       sending:    'bg-warning/15 text-warning',
       sent:       'bg-success/15 text-success',
-      cancelled:  'bg-white/10 text-subtle',
+      cancelled:  'bg-veil/10 text-subtle',
       failed:     'bg-danger/15 text-danger',
     };
-    return map[s] || 'bg-white/10 text-muted';
+    return map[s] || 'bg-veil/10 text-muted';
   };
 
   return (

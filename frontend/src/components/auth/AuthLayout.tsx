@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Logo } from '@/components/ui/Logo';
 import { StreamGraphic } from '@/components/ui/StreamGraphic';
 import { WavyBackground } from '@/components/ui/WavyBackground';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -13,13 +14,22 @@ export function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Mobile top nav (visible only on small screens) */}
-      <div className="lg:hidden flex items-center justify-between p-5 border-b border-white/5 relative z-20">
+      <div className="lg:hidden flex items-center justify-between p-5 border-b border-border relative z-20">
         <Logo size="sm" />
-        <Link href="/" className="text-sm text-muted hover:text-text transition">← Home</Link>
+        <div className="flex items-center gap-1">
+          <Link href="/" className="text-sm text-muted hover:text-text transition px-2">← Home</Link>
+          <ThemeToggle />
+        </div>
       </div>
 
       <div className="flex-1 flex">
-        {/* LEFT: illustration — hidden on mobile, visible lg+ */}
+        {/* LEFT: illustration — hidden on mobile, visible lg+.
+
+            This panel keeps its fixed violet gradient in both themes. It is
+            artwork rather than chrome, and it is what gives the sign-in page
+            its identity; bleaching it for light mode would leave a blank
+            column. So the white text and white-alpha values inside it stay
+            white — they sit on that gradient, not on the page. */}
         <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-gradient-to-br from-[#1A0E3A] via-[#2D0F5F] to-[#7C3AED]">
           <WavyBackground />
           <div className="relative z-10 flex flex-col justify-between p-12 w-full">
@@ -54,6 +64,13 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
         {/* RIGHT: form area */}
         <div className="flex-1 flex flex-col min-w-0">
+          {/* On lg+ the mobile top nav is hidden, so the theme control needs its
+              own quiet perch above the form. */}
+          <div className="hidden lg:flex items-center justify-end gap-2 px-8 pt-6 relative z-20">
+            <Link href="/" className="text-sm text-muted hover:text-text transition px-2">← Home</Link>
+            <ThemeToggle />
+          </div>
+
           <div className="flex-1 relative overflow-hidden">
             <WavyBackground className="lg:hidden" />
             <div className="relative z-10 w-full max-w-md mx-auto px-6 py-10 lg:py-16">
@@ -68,7 +85,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
           </div>
 
           {/* Footer */}
-          <footer className="border-t border-white/5 py-5 px-6">
+          <footer className="border-t border-border py-5 px-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted max-w-md mx-auto">
               <p>© {new Date().getFullYear()} OmliveStream</p>
               <div className="flex gap-5">

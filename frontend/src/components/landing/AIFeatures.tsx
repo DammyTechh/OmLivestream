@@ -77,7 +77,7 @@ export function AIFeatures() {
               viewport={{ once: true }}
               transition={{ delay: i * 0.08 }}
               whileHover={{ y: -4 }}
-              className="group relative rounded-2xl bg-[#14102A]/60 border border-primary/15 p-6 hover:border-primary/40 transition-all overflow-hidden"
+              className="group relative rounded-2xl bg-surface/60 border border-border p-6 hover:border-primary/40 transition-all overflow-hidden"
             >
               <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br ${c.accent} opacity-10 blur-2xl group-hover:opacity-20 transition`} />
               <div className={`relative w-11 h-11 rounded-xl bg-gradient-to-br ${c.accent} flex items-center justify-center mb-5 shadow-lg`}>
@@ -94,21 +94,24 @@ export function AIFeatures() {
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mt-16 rounded-3xl bg-gradient-to-br from-primary/10 via-purple-900/5 to-accent/10 border border-primary/25 p-8 md:p-10"
+          className="mt-16 rounded-3xl bg-gradient-to-br from-primary/10 via-primary-deep/[0.06] to-accent/10 border border-primary/25 p-6 sm:p-8 md:p-10"
         >
           <div className="grid md:grid-cols-2 gap-8 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-muted mb-4">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-veil/5 border border-veil/10 text-xs text-muted mb-4">
                 <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" /> Live demo
               </div>
-              <h3 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-3">
-                "Make me 5 viral titles for my Valorant stream"
+              {/* text-balance keeps the quote from breaking to a one-word last
+                  line, and the explicit quote marks are curly so they render
+                  as typography rather than as inch marks. */}
+              <h3 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-3 text-balance">
+                &ldquo;Make me 5 viral titles for my Valorant stream&rdquo;
               </h3>
-              <p className="text-muted leading-relaxed">
+              <p className="text-muted leading-relaxed text-pretty">
                 Our AI Studio is available to every streamer from day one. Generate, refine, and publish — all without leaving OmliveStream.
               </p>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0">
               {[
                 'Ranked Grind to Immortal — Drop Any Tips?',
                 "Clutch or Kick — It's Friday Night Valorant",
@@ -122,10 +125,20 @@ export function AIFeatures() {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.3 + i * 0.1 }}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-[#1F1538]/60 border border-primary/15 text-sm"
+                  // items-start, not items-center: once a title wraps to two
+                  // lines the icon should stay on the first line rather than
+                  // float to the vertical middle of the block.
+                  className="flex items-start gap-3 p-3 rounded-xl bg-elevated/60 border border-border text-sm"
                 >
-                  <Sparkles size={14} className="text-primary shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{t}</span>
+                  <Sparkles size={14} className="text-primary shrink-0 mt-[3px]" />
+                  {/* These titles used to be `truncate`, which on a 390px
+                      screen left a ~31-character budget against titles of up
+                      to 50 — so every one was cut mid-word, including the
+                      demo's most persuasive example. A generated-titles demo
+                      that hides the generated titles argues against itself,
+                      so they wrap instead. min-w-0 keeps the flex item from
+                      refusing to shrink below its longest word. */}
+                  <span className="min-w-0 flex-1 text-pretty">{t}</span>
                 </motion.div>
               ))}
             </div>

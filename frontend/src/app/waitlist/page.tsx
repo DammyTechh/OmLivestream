@@ -65,7 +65,7 @@ export default function WaitlistPage() {
             className="grid md:grid-cols-3 gap-4 mb-12"
           >
             {BENEFITS.map((b, i) => (
-              <div key={i} className="rounded-2xl p-6 bg-[#14102A]/60 border border-primary/20">
+              <div key={i} className="rounded-2xl p-6 bg-surface/60 border border-border">
                 <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center mb-4">
                   <b.Icon size={20} className="text-primary" />
                 </div>
@@ -99,7 +99,7 @@ export default function WaitlistPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
               onSubmit={submit}
-              className="max-w-xl mx-auto rounded-3xl p-8 bg-[#14102A]/70 border border-primary/20"
+              className="max-w-xl mx-auto rounded-3xl p-8 bg-surface/70 border border-border"
             >
               <label className="text-sm font-medium text-muted mb-2 block">Your email</label>
               <div className="relative mb-4">
@@ -109,7 +109,7 @@ export default function WaitlistPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full pl-12 pr-5 py-4 rounded-2xl bg-[#1F1538]/60 border border-primary/20 text-text placeholder:text-muted focus:border-primary/60 focus:outline-none transition"
+                  className="w-full pl-12 pr-5 py-4 rounded-2xl bg-elevated/60 border border-border text-text placeholder:text-muted focus:border-primary/60 focus:outline-none transition"
                 />
               </div>
               <button

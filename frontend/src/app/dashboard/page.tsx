@@ -132,7 +132,7 @@ export default function DashboardHomePage() {
               </div>
               <div className="font-display text-3xl font-semibold tracking-tight">
                 {loading
-                  ? <span className="inline-block w-16 h-8 rounded bg-white/5 animate-pulse align-middle" />
+                  ? <span className="inline-block w-16 h-8 rounded bg-veil/5 animate-pulse align-middle" />
                   : formatNumber(s.value)}
               </div>
               <div className="text-xs text-muted mt-1">{s.label}</div>
@@ -167,7 +167,7 @@ export default function DashboardHomePage() {
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
                       <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                        s.status === 'live' ? 'bg-danger/20' : s.status === 'scheduled' ? 'bg-primary/20' : 'bg-white/5'
+                        s.status === 'live' ? 'bg-danger/20' : s.status === 'scheduled' ? 'bg-primary/20' : 'bg-veil/5'
                       }`}>
                         <Radio size={18} className={
                           s.status === 'live' ? 'text-danger animate-pulse' :

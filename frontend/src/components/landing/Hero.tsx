@@ -95,7 +95,7 @@ export function Hero() {
                   </Link>
                   <Link
                     href="/dashboard/streams/new"
-                    className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-white/5 border border-primary/30 text-text font-semibold hover:bg-white/10 transition"
+                    className="flex items-center justify-center gap-2 py-4 rounded-2xl bg-veil/5 border border-primary/30 text-text font-semibold hover:bg-veil/10 transition"
                   >
                     <Radio size={18} /> Go Live
                   </Link>
@@ -111,7 +111,7 @@ export function Hero() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="Enter your email"
-                      className="w-full px-5 py-4 pr-12 rounded-2xl bg-[#1F1538]/60 border border-primary/20 text-text placeholder:text-muted focus:border-primary/60 focus:outline-none transition"
+                      className="w-full px-5 py-4 pr-12 rounded-2xl bg-elevated/60 border border-border text-text placeholder:text-muted focus:border-primary/60 focus:outline-none transition"
                     />
                     <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-muted" size={18} />
                   </div>
@@ -145,7 +145,7 @@ export function Hero() {
               <motion.div
                 key={p.name}
                 whileHover={{ y: -4, scale: 1.05 }}
-                className="w-16 h-16 rounded-full bg-[#14102A] border border-primary/20 flex items-center justify-center hover:border-primary/50 transition"
+                className="w-16 h-16 rounded-full bg-surface border border-border flex items-center justify-center hover:border-primary/50 transition"
               >
                 <p.Icon size={28} />
               </motion.div>

@@ -137,7 +137,7 @@ export default function VerifyPage() {
             onChange={(e) => handleChange(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
             onPaste={i === 0 ? handlePaste : undefined}
-            className="w-12 h-14 text-center text-2xl font-display font-semibold rounded-xl bg-[#1F1538]/60 border border-primary/20 focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            className="w-12 h-14 text-center text-2xl font-display font-semibold rounded-xl bg-elevated/60 border border-border focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           />
         ))}
       </div>

@@ -93,7 +93,7 @@ export function AboutContent() {
             </Link>
             <Link
               href="/#features"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/5 border border-white/10 text-text font-medium hover:bg-white/10 transition"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-veil/5 border border-veil/10 text-text font-medium hover:bg-veil/10 transition"
             >
               Explore Features
             </Link>
@@ -119,7 +119,7 @@ export function AboutContent() {
               {PROBLEMS.map((p, i) => (
                 <div
                   key={i}
-                  className="flex items-start gap-3 p-4 rounded-2xl bg-[#14102A]/60 border border-primary/15"
+                  className="flex items-start gap-3 p-4 rounded-2xl bg-surface/60 border border-border"
                 >
                   <span className="mt-0.5 w-5 h-5 rounded-full bg-danger/15 border border-danger/40 text-danger text-xs flex items-center justify-center shrink-0">✕</span>
                   <span className="min-w-0 text-sm text-muted leading-relaxed">{p}</span>
@@ -148,7 +148,7 @@ export function AboutContent() {
                 key={i}
                 {...reveal}
                 transition={{ delay: (i % 4) * 0.06 }}
-                className="group rounded-2xl bg-[#14102A]/60 border border-primary/15 p-6 hover:border-primary/40 transition-all"
+                className="group rounded-2xl bg-surface/60 border border-border p-6 hover:border-primary/40 transition-all"
               >
                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-5 shadow-lg">
                   <f.Icon size={20} className="text-white" />
@@ -175,7 +175,7 @@ export function AboutContent() {
                 key={i}
                 {...reveal}
                 transition={{ delay: (i % 3) * 0.06 }}
-                className="flex items-start gap-4 p-6 rounded-2xl bg-[#14102A]/60 border border-primary/15"
+                className="flex items-start gap-4 p-6 rounded-2xl bg-surface/60 border border-border"
               >
                 <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
                   <v.Icon size={18} className="text-primary" />
@@ -200,7 +200,7 @@ export function AboutContent() {
             {AUDIENCE.map((a, i) => (
               <span
                 key={i}
-                className="px-4 py-2 rounded-full bg-[#1F1538]/60 border border-primary/15 text-sm text-muted hover:border-primary/40 hover:text-text transition"
+                className="px-4 py-2 rounded-full bg-elevated/60 border border-border text-sm text-muted hover:border-primary/40 hover:text-text transition"
               >
                 {a}
               </span>
@@ -214,11 +214,11 @@ export function AboutContent() {
         <div className="mx-auto max-w-6xl px-6">
           <motion.div
             {...reveal}
-            className="rounded-3xl bg-gradient-to-br from-primary/10 via-purple-900/5 to-accent/10 border border-primary/25 p-8 md:p-12"
+            className="rounded-3xl bg-gradient-to-br from-primary/10 via-primary-deep/[0.06] to-accent/10 border border-primary/25 p-8 md:p-12"
           >
             <div className="grid lg:grid-cols-2 gap-10 items-center">
               <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-muted mb-5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-veil/5 border border-veil/10 text-xs text-muted mb-5">
                   <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" /> On the roadmap
                 </div>
                 <h2 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-4">
@@ -237,7 +237,7 @@ export function AboutContent() {
                   ))}
                 </ul>
               </div>
-              <div className="rounded-2xl bg-[#14102A]/70 border border-primary/20 p-7">
+              <div className="rounded-2xl bg-surface/70 border border-border p-7">
                 <Users size={22} className="text-primary mb-4" />
                 <h3 className="font-display text-xl font-semibold mb-2">Join the waitlist</h3>
                 <p className="text-sm text-muted leading-relaxed mb-5">

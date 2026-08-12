@@ -49,7 +49,7 @@ export default function StreamsPage() {
             key={f}
             onClick={() => setFilter(f)}
             className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition ${
-              filter === f ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'
+              filter === f ? 'bg-primary text-white' : 'bg-veil/5 text-muted hover:bg-veil/10'
             }`}
           >
             {f}
@@ -73,7 +73,7 @@ export default function StreamsPage() {
                 <div className="flex items-center gap-4">
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
                     s.status === 'live' ? 'bg-danger/20' :
-                    s.status === 'scheduled' ? 'bg-primary/20' : 'bg-white/5'
+                    s.status === 'scheduled' ? 'bg-primary/20' : 'bg-veil/5'
                   }`}>
                     <Radio size={18} className={
                       s.status === 'live' ? 'text-danger animate-pulse' :

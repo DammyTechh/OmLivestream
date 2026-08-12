@@ -5,7 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card } from '@/components/ui/Card';
 import { api } from '@/lib/api';
 import { formatNumber } from '@/lib/utils';
-import { palette, chartAxis, chartTooltip } from '@/lib/theme';
+import { useChartTheme } from '@/lib/theme';
 
 /**
  * Shape of GET /analytics/overview. These are camelCase because that is what
@@ -35,6 +35,9 @@ interface PlatformRow {
 }
 
 export default function AnalyticsPage() {
+  // Recharts takes literal colours, not classes, so the chart palette has to
+  // be resolved for whichever theme is on screen.
+  const { palette, axis, tooltip } = useChartTheme();
   const [overview, setOverview] = useState<Overview>({});
   const [rows, setRows] = useState<PlatformRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,7 +130,7 @@ export default function AnalyticsPage() {
               <s.icon size={18} style={{ color: s.color }} />
             </div>
             <div className="font-display text-3xl font-semibold">
-              {loading ? <span className="inline-block w-16 h-8 rounded bg-white/5 animate-pulse align-middle" /> : formatNumber(s.value)}
+              {loading ? <span className="inline-block w-16 h-8 rounded bg-veil/5 animate-pulse align-middle" /> : formatNumber(s.value)}
             </div>
             <div className="text-xs text-muted mt-1">{s.label}</div>
           </Card>
@@ -138,7 +141,7 @@ export default function AnalyticsPage() {
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Views over time</h2>
         {loading ? (
-          <div className="h-72 rounded-xl bg-white/[0.03] animate-pulse" />
+          <div className="h-72 rounded-xl bg-veil/[0.03] animate-pulse" />
         ) : trendData.length === 0 ? (
           <div className="h-72 flex flex-col items-center justify-center text-center">
             <BarChart3 size={30} className="text-muted opacity-40 mb-3" />
@@ -155,10 +158,10 @@ export default function AnalyticsPage() {
                     <stop offset="100%" stopColor={palette.primary} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray={chartAxis.gridDash} stroke={chartAxis.gridStroke} />
-                <XAxis dataKey="day" stroke={chartAxis.stroke} fontSize={12} />
-                <YAxis stroke={chartAxis.stroke} fontSize={12} />
-                <Tooltip contentStyle={chartTooltip} />
+                <CartesianGrid strokeDasharray={axis.gridDash} stroke={axis.gridStroke} />
+                <XAxis dataKey="day" stroke={axis.stroke} fontSize={12} />
+                <YAxis stroke={axis.stroke} fontSize={12} />
+                <Tooltip contentStyle={tooltip} />
                 <Area type="monotone" dataKey="views" stroke={palette.primary} fill="url(#v)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
@@ -170,17 +173,17 @@ export default function AnalyticsPage() {
       <Card className="p-6">
         <h2 className="font-display text-xl font-semibold mb-4">Platform breakdown</h2>
         {loading ? (
-          <div className="h-72 rounded-xl bg-white/[0.03] animate-pulse" />
+          <div className="h-72 rounded-xl bg-veil/[0.03] animate-pulse" />
         ) : !hasData ? (
           <div className="h-40 flex items-center justify-center text-muted text-sm">No data yet — go live to start collecting.</div>
         ) : (
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={byPlatform}>
-                <CartesianGrid strokeDasharray={chartAxis.gridDash} stroke={chartAxis.gridStroke} />
-                <XAxis dataKey="platform" stroke={chartAxis.stroke} fontSize={12} />
-                <YAxis stroke={chartAxis.stroke} fontSize={12} />
-                <Tooltip contentStyle={chartTooltip} />
+                <CartesianGrid strokeDasharray={axis.gridDash} stroke={axis.gridStroke} />
+                <XAxis dataKey="platform" stroke={axis.stroke} fontSize={12} />
+                <YAxis stroke={axis.stroke} fontSize={12} />
+                <Tooltip contentStyle={tooltip} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="views"       fill={palette.primary}     radius={[6, 6, 0, 0]} name="Views" />
                 <Bar dataKey="peakViewers" fill={palette.primaryDeep} radius={[6, 6, 0, 0]} name="Peak audience" />

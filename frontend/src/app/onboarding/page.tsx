@@ -143,11 +143,11 @@ export default function OnboardingPage() {
             {stepTitles.map((s, i) => (
               <div key={i} className="flex items-center flex-1 last:flex-initial">
                 <div className={`relative flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all ${
-                  step >= i ? 'bg-primary border-primary text-white' : 'border-white/20 text-muted'
+                  step >= i ? 'bg-primary border-primary text-white' : 'border-veil/20 text-muted'
                 }`}>
                   {step > i ? <Check size={18} /> : <s.icon size={16} />}
                 </div>
-                {i < 2 && <div className={`flex-1 h-0.5 mx-2 transition-all ${step > i ? 'bg-primary' : 'bg-white/10'}`} />}
+                {i < 2 && <div className={`flex-1 h-0.5 mx-2 transition-all ${step > i ? 'bg-primary' : 'bg-veil/10'}`} />}
               </div>
             ))}
           </div>
@@ -192,7 +192,7 @@ export default function OnboardingPage() {
                       className={`p-4 rounded-2xl border text-sm font-medium transition-all ${
                         heardFrom.includes(item.value)
                           ? 'border-primary bg-primary/10 text-text'
-                          : 'border-white/10 bg-white/[0.02] text-muted hover:border-white/20 hover:text-text'
+                          : 'border-veil/10 bg-veil/[0.02] text-muted hover:border-veil/20 hover:text-text'
                       }`}
                     >
                       {item.label}
@@ -210,7 +210,7 @@ export default function OnboardingPage() {
                       className={`p-4 rounded-2xl border text-sm font-medium transition-all ${
                         useCase.includes(item.value)
                           ? 'border-primary bg-primary/10 text-text'
-                          : 'border-white/10 bg-white/[0.02] text-muted hover:border-white/20 hover:text-text'
+                          : 'border-veil/10 bg-veil/[0.02] text-muted hover:border-veil/20 hover:text-text'
                       }`}
                     >
                       {item.label}

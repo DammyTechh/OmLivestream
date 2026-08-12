@@ -6,12 +6,20 @@ import { GoogleIcon, FacebookIcon, InstagramIcon, TwitchIcon, TikTokIcon } from 
 
 type Provider = 'google' | 'facebook' | 'instagram' | 'tiktok' | 'twitch';
 
-const PROVIDERS: Record<Provider, { label: string; Icon: React.FC<{ size?: number }>; bg: string }> = {
-  google:    { label: 'Google',    Icon: GoogleIcon,    bg: '#FFFFFF' },
-  facebook:  { label: 'Facebook',  Icon: FacebookIcon,  bg: '#14102A' },
-  instagram: { label: 'Instagram', Icon: InstagramIcon, bg: '#14102A' },
-  tiktok:    { label: 'TikTok',    Icon: TikTokIcon,    bg: '#14102A' },
-  twitch:    { label: 'Twitch',    Icon: TwitchIcon,    bg: '#14102A' },
+/**
+ * No per-provider tile colour. Every one of these marks is already
+ * self-sufficient — Facebook and Instagram carry their own filled backing,
+ * Google and Twitch are drawn in brand colour on transparent, and TikTok's
+ * monochrome glyph now inherits `currentColor` — so a single themed tile works
+ * on either polarity. The previous map hardcoded #14102A for four of the five,
+ * which put four navy squares on a white sign-in page.
+ */
+const PROVIDERS: Record<Provider, { label: string; Icon: React.FC<{ size?: number }> }> = {
+  google:    { label: 'Google',    Icon: GoogleIcon    },
+  facebook:  { label: 'Facebook',  Icon: FacebookIcon  },
+  instagram: { label: 'Instagram', Icon: InstagramIcon },
+  tiktok:    { label: 'TikTok',    Icon: TikTokIcon    },
+  twitch:    { label: 'Twitch',    Icon: TwitchIcon    },
 };
 
 const GRID_COLS: Record<number, string> = {
@@ -75,8 +83,7 @@ export function SocialButtons({ label = 'or continue with' }: { label?: string }
               type="button"
               onClick={() => start(id)}
               disabled={loading !== null}
-              className="h-14 rounded-xl flex items-center justify-center transition hover:scale-105 border border-white/10 hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: p.bg }}
+              className="h-14 rounded-xl flex items-center justify-center transition hover:scale-105 bg-surface text-text border border-border hover:border-primary/40 disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label={`Continue with ${p.label}`}
               title={`Continue with ${p.label}`}
             >

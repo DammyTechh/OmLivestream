@@ -44,7 +44,7 @@ export default function SignInPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Enter email"
-            className="w-full px-5 py-4 pr-12 rounded-2xl bg-[#1F1538]/60 border border-primary/20 text-text placeholder:text-muted focus:border-primary/60 focus:outline-none transition"
+            className="w-full px-5 py-4 pr-12 rounded-2xl bg-elevated/60 border border-border text-text placeholder:text-muted focus:border-primary/60 focus:outline-none transition"
             required
           />
           <Mail className="absolute right-4 top-1/2 -translate-y-1/2 text-muted" size={18} />

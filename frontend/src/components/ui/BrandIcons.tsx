@@ -64,7 +64,13 @@ export function YouTubeIcon({ size = 22 }: { size?: number }) {
 export function TikTokIcon({ size = 22 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005.8 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1.84-.1z" fill="#FFFFFF"/>
+      {/* The base glyph is TikTok's monochrome mark, which their own guidelines
+          publish in both black and white. `currentColor` picks whichever the
+          surrounding theme calls for — as a literal #FFFFFF it vanished on the
+          light sign-in page. (currentColor is a valid keyword in a presentation
+          attribute; var() is not, which is why the rest of the retrofit uses
+          inline style for SVG.) */}
+      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005.8 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1.84-.1z" fill="currentColor"/>
       <path d="M17.59 4.69a4.83 4.83 0 01-3.77-4.25V0h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V7.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 003.8 18.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1.84-.1z" fill="#25F4EE" opacity="0.7"/>
       <path d="M18.59 5.69a4.83 4.83 0 01-3.77-4.25V1h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V8.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 004.8 19.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1.84-.1z" fill="#FE2C55" opacity="0.8"/>
     </svg>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Users, MessageSquare, Send, CreditCard, ShieldCheck, LogOut, Activity } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { useAdmin } from '@/store/auth';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +32,7 @@ export function AdminSidebar() {
       </div>
 
       <div className="px-4 mb-4 text-xs">
-        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10">
+        <div className="p-3 rounded-xl bg-veil/[0.03] border border-veil/10">
           <div className="text-text font-medium truncate">{admin?.full_name}</div>
           <div className="text-muted capitalize text-[11px]">{admin?.role?.replace('_', ' ')}</div>
         </div>
@@ -46,11 +47,15 @@ export function AdminSidebar() {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-border">
-        <button onClick={handleLogout} className="sidebar-link w-full text-left">
+      {/* The admin area has no top bar, so the theme control lives here beside
+          logout — the two footer actions that are about the session rather than
+          about navigating the product. */}
+      <div className="p-4 border-t border-border flex items-center gap-2">
+        <button onClick={handleLogout} className="sidebar-link flex-1 text-left">
           <LogOut size={18} />
           <span>Logout</span>
         </button>
+        <ThemeToggle />
       </div>
     </aside>
   );

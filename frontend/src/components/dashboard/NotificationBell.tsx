@@ -135,7 +135,7 @@ export function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 transition flex items-center justify-center"
+        className="relative w-10 h-10 rounded-xl bg-veil/5 hover:bg-veil/10 transition flex items-center justify-center"
         aria-label="Notifications"
       >
         <Bell size={17} />
@@ -147,8 +147,8 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[22rem] max-w-[90vw] rounded-2xl bg-[#14102A] border border-white/10 shadow-2xl overflow-hidden z-50">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+        <div className="absolute right-0 top-full mt-2 w-[22rem] max-w-[90vw] rounded-2xl bg-surface border border-veil/10 shadow-2xl overflow-hidden z-50">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-veil/5">
             <div className="font-display text-base font-semibold">Notifications</div>
             {unread > 0 && (
               <button onClick={markAllRead} className="text-xs text-primary hover:underline">
@@ -158,7 +158,7 @@ export function NotificationBell() {
           </div>
 
           {askPermission && (
-            <div className="flex gap-3 px-4 py-3 bg-primary/[0.06] border-b border-white/5">
+            <div className="flex gap-3 px-4 py-3 bg-primary/[0.06] border-b border-veil/5">
               <BellRing size={15} className="text-primary shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-text">Get these on your desktop even when this tab is in the background.</p>
@@ -189,9 +189,9 @@ export function NotificationBell() {
                 const inner = (
                   <div
                     onClick={() => isUnread && markOneRead(n.id)}
-                    className={`flex gap-3 px-4 py-3 border-b border-white/5 cursor-pointer transition hover:bg-white/[0.03] ${isUnread ? 'bg-primary/[0.03]' : ''}`}
+                    className={`flex gap-3 px-4 py-3 border-b border-veil/5 cursor-pointer transition hover:bg-veil/[0.03] ${isUnread ? 'bg-primary/[0.03]' : ''}`}
                   >
-                    <div className={`w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0 ${meta.color}`}>
+                    <div className={`w-8 h-8 rounded-lg bg-veil/5 flex items-center justify-center shrink-0 ${meta.color}`}>
                       <meta.Icon size={14} />
                     </div>
                     <div className="flex-1 min-w-0">

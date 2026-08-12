@@ -92,7 +92,7 @@ function ComposerContent() {
                 className={`p-3 rounded-xl border text-sm text-left transition ${
                   form.segment === s.id
                     ? 'border-primary bg-primary/10 text-text'
-                    : 'border-white/10 bg-white/[0.02] text-muted hover:border-white/20'
+                    : 'border-veil/10 bg-veil/[0.02] text-muted hover:border-veil/20'
                 }`}
               >
                 {s.label}

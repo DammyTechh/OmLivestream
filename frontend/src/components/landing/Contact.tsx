@@ -49,7 +49,7 @@ export function Contact() {
         </div>
 
         {/* Contact Us card */}
-        <div className="grid md:grid-cols-2 gap-10 rounded-[28px] bg-[#14102A]/60 border border-primary/20 p-8 md:p-12">
+        <div className="grid md:grid-cols-2 gap-10 rounded-[28px] bg-surface/60 border border-border p-8 md:p-12">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-[11px] text-primary mb-5">
               <Mail size={11} /> Send us a message
@@ -61,15 +61,15 @@ export function Contact() {
             <div>
               <p className="text-xs text-muted mb-3">Or visit us on our social media handles:</p>
               <div className="flex flex-col gap-2.5">
-                <a href="#" className="inline-flex items-center gap-2.5 text-muted hover:text-text transition w-fit px-3 py-1.5 rounded-full bg-[#1F1538]/60 border border-primary/15">
+                <a href="#" className="inline-flex items-center gap-2.5 text-muted hover:text-text transition w-fit px-3 py-1.5 rounded-full bg-elevated/60 border border-border">
                   <FacebookIcon size={14} />
                   <span className="text-xs">omlivestream@facebook</span>
                 </a>
-                <a href="#" className="inline-flex items-center gap-2.5 text-muted hover:text-text transition w-fit px-3 py-1.5 rounded-full bg-[#1F1538]/60 border border-primary/15">
+                <a href="#" className="inline-flex items-center gap-2.5 text-muted hover:text-text transition w-fit px-3 py-1.5 rounded-full bg-elevated/60 border border-border">
                   <InstagramIcon size={14} />
                   <span className="text-xs">omlivestream@instagram</span>
                 </a>
-                <a href="#" className="inline-flex items-center gap-2.5 text-muted hover:text-text transition w-fit px-3 py-1.5 rounded-full bg-[#1F1538]/60 border border-primary/15">
+                <a href="#" className="inline-flex items-center gap-2.5 text-muted hover:text-text transition w-fit px-3 py-1.5 rounded-full bg-elevated/60 border border-border">
                   <TikTokIcon size={14} />
                   <span className="text-xs">omlivestream@tiktok</span>
                 </a>
@@ -84,7 +84,7 @@ export function Contact() {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Your fullname"
-                className="w-full px-4 py-3 rounded-xl bg-[#1F1538]/60 border border-primary/15 text-text placeholder:text-muted/60 focus:border-primary/50 focus:outline-none transition"
+                className="w-full px-4 py-3 rounded-xl bg-elevated/60 border border-border text-text placeholder:text-muted/60 focus:border-primary/50 focus:outline-none transition"
               />
             </div>
             <div>
@@ -94,7 +94,7 @@ export function Contact() {
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="Enter email"
-                className="w-full px-4 py-3 rounded-xl bg-[#1F1538]/60 border border-primary/15 text-text placeholder:text-muted/60 focus:border-primary/50 focus:outline-none transition"
+                className="w-full px-4 py-3 rounded-xl bg-elevated/60 border border-border text-text placeholder:text-muted/60 focus:border-primary/50 focus:outline-none transition"
               />
             </div>
             <div>
@@ -103,7 +103,7 @@ export function Contact() {
                 onChange={(e) => setForm({ ...form, message: e.target.value })}
                 placeholder="write us a message"
                 rows={5}
-                className="w-full px-4 py-3 rounded-xl bg-[#1F1538]/60 border border-primary/15 text-text placeholder:text-muted/60 focus:border-primary/50 focus:outline-none transition resize-none"
+                className="w-full px-4 py-3 rounded-xl bg-elevated/60 border border-border text-text placeholder:text-muted/60 focus:border-primary/50 focus:outline-none transition resize-none"
               />
             </div>
             <button

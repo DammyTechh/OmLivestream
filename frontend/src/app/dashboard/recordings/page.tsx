@@ -93,15 +93,15 @@ export default function RecordingsPage() {
                 </div>
                 {r.status === 'ready' && (
                   <div className="flex gap-2">
-                    <button onClick={() => edit(r.id)} className="p-2 rounded-xl bg-white/5 hover:bg-primary/20 text-muted hover:text-primary transition" title="AI edit">
+                    <button onClick={() => edit(r.id)} className="p-2 rounded-xl bg-veil/5 hover:bg-primary/20 text-muted hover:text-primary transition" title="AI edit">
                       <Wand2 size={16} />
                     </button>
                     {r.file_url && (
-                      <a href={r.file_url} download className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-muted hover:text-text transition" title="Download">
+                      <a href={r.file_url} download className="p-2 rounded-xl bg-veil/5 hover:bg-veil/10 text-muted hover:text-text transition" title="Download">
                         <Download size={16} />
                       </a>
                     )}
-                    <button onClick={() => remove(r.id)} className="p-2 rounded-xl bg-white/5 hover:bg-danger/20 text-muted hover:text-danger transition" title="Delete">
+                    <button onClick={() => remove(r.id)} className="p-2 rounded-xl bg-veil/5 hover:bg-danger/20 text-muted hover:text-danger transition" title="Delete">
                       <Trash2 size={16} />
                     </button>
                   </div>

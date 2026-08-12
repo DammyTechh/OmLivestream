@@ -44,7 +44,7 @@ export function Pricing() {
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="relative rounded-[28px] p-8 bg-[#14102A]/60 border border-primary/20"
+            className="relative rounded-[28px] p-8 bg-surface/60 border border-border"
           >
             <h3 className="font-display text-2xl font-semibold mb-4">Free</h3>
             <div className="mb-5">
@@ -63,7 +63,7 @@ export function Pricing() {
             </div>
 
             <button
-              className="w-full py-3.5 rounded-2xl bg-[#1F1538]/60 border border-primary/20 text-muted font-semibold cursor-not-allowed"
+              className="w-full py-3.5 rounded-2xl bg-elevated/60 border border-border text-muted font-semibold cursor-not-allowed"
               disabled
             >
               Current Plan
@@ -76,7 +76,7 @@ export function Pricing() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.15 }}
-            className="relative rounded-[28px] p-8 bg-[#14102A]/60 border border-primary/30 shadow-2xl shadow-primary/10"
+            className="relative rounded-[28px] p-8 bg-surface/60 border border-primary/30 shadow-2xl shadow-primary/10"
           >
             <h3 className="font-display text-2xl font-semibold mb-4">Premium</h3>
             <div className="mb-3">

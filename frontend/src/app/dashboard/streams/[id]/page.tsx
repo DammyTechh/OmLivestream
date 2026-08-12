@@ -195,7 +195,7 @@ export default function StreamDetailPage() {
             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${
               stream.status === 'live'      ? 'bg-danger/20 text-danger' :
               stream.status === 'scheduled' ? 'bg-primary/20 text-primary' :
-              'bg-white/10 text-muted'
+              'bg-veil/10 text-muted'
             }`}>
               {stream.status === 'live' && <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />}
               {stream.status.toUpperCase()}
@@ -252,7 +252,7 @@ export default function StreamDetailPage() {
           {stream.stream_platforms?.map((p) => {
             const Icon = PLATFORM_ICONS[p.platform];
             return (
-              <div key={p.platform} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10">
+              <div key={p.platform} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-veil/5 border border-veil/10">
                 <div className={`w-2 h-2 rounded-full ${p.rtmp_push_status === 'active' ? 'bg-success animate-pulse' : 'bg-muted'}`} />
                 {Icon && <Icon size={14} />}
                 <span className="text-sm capitalize">{p.platform}</span>
@@ -272,7 +272,7 @@ export default function StreamDetailPage() {
               <button
                 onClick={() => setFilterPlatform('all')}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition ${
-                  filterPlatform === 'all' ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'
+                  filterPlatform === 'all' ? 'bg-primary text-white' : 'bg-veil/5 text-muted hover:bg-veil/10'
                 }`}
               >
                 All ({comments.length})
@@ -282,7 +282,7 @@ export default function StreamDetailPage() {
                   key={p.platform}
                   onClick={() => setFilterPlatform(p.platform)}
                   className={`px-3 py-1 rounded-full text-xs font-medium capitalize transition ${
-                    filterPlatform === p.platform ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'
+                    filterPlatform === p.platform ? 'bg-primary text-white' : 'bg-veil/5 text-muted hover:bg-veil/10'
                   }`}
                 >
                   {p.platform}
@@ -299,12 +299,12 @@ export default function StreamDetailPage() {
                 {filteredComments.map((c) => {
                   const Icon = PLATFORM_ICONS[c.platform];
                   return (
-                    <div key={c.id} className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/5 transition">
+                    <div key={c.id} className="flex items-start gap-3 p-3 rounded-xl bg-veil/[0.02] hover:bg-veil/5 transition">
                       {Icon ? <Icon size={14} /> : <div className="w-3.5 h-3.5 rounded-full bg-primary mt-1" />}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2">
                           <span className="font-medium text-sm">{c.author}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/5 text-muted capitalize">{c.platform}</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-veil/5 text-muted capitalize">{c.platform}</span>
                         </div>
                         <p className="text-sm text-muted">{c.text}</p>
                         {replyFor?.id === c.id ? (

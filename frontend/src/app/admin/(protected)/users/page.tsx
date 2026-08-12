@@ -54,7 +54,7 @@ function UsersContent() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search email or name…"
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-sm focus:border-primary/60 focus:outline-none placeholder:text-muted"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-veil/[0.03] border border-veil/10 text-sm focus:border-primary/60 focus:outline-none placeholder:text-muted"
           />
         </div>
       </form>
@@ -69,7 +69,7 @@ function UsersContent() {
       ) : (
         <Card className="!p-0 overflow-hidden">
           <table className="w-full">
-            <thead className="bg-white/[0.03]">
+            <thead className="bg-veil/[0.03]">
               <tr className="text-left text-xs uppercase tracking-widest text-muted">
                 <th className="py-3 px-5">Name</th>
                 <th className="py-3 px-5">Email</th>
@@ -81,7 +81,7 @@ function UsersContent() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-t border-border hover:bg-white/[0.02] transition">
+                <tr key={u.id} className="border-t border-border hover:bg-veil/[0.02] transition">
                   <td className="py-3 px-5 font-medium">{u.full_name || '—'}</td>
                   <td className="py-3 px-5 text-muted">{u.email}</td>
                   <td className="py-3 px-5">

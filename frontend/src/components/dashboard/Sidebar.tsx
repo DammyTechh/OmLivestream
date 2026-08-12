@@ -28,7 +28,7 @@ export function Sidebar() {
   const handleLogout = () => { logout(); router.push('/'); };
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 h-screen sticky top-0 border-r border-white/5 bg-[#0D0A1E]">
+    <aside className="hidden lg:flex flex-col w-64 h-screen sticky top-0 border-r border-veil/5 bg-bg">
       <div className="p-6">
         <Logo size="sm" />
       </div>
@@ -49,13 +49,13 @@ export function Sidebar() {
             <span className="text-xs font-semibold">Upgrade to Premium</span>
           </div>
           <p className="text-xs text-muted mb-3">Stream to all 8 platforms. Reply to comments. AI video editing.</p>
-          <Link href="/payment?plan=premium" className="block w-full text-center py-2 rounded-xl bg-white/10 text-xs font-semibold hover:bg-white/15 transition">
+          <Link href="/payment?plan=premium" className="block w-full text-center py-2 rounded-xl bg-veil/10 text-xs font-semibold hover:bg-veil/15 transition">
             Upgrade
           </Link>
         </div>
       )}
 
-      <div className="p-4 border-t border-white/5">
+      <div className="p-4 border-t border-veil/5">
         <button onClick={handleLogout} className="sidebar-link w-full text-left">
           <LogOut size={18} />
           <span>Logout</span>

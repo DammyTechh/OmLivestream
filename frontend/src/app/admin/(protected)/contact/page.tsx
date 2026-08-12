@@ -77,7 +77,7 @@ function ContactInboxContent() {
 
   const statusBadge = (s: ContactSubmission['status']) => (
     s === 'unread'  ? 'bg-primary/20 text-primary'   :
-    s === 'read'    ? 'bg-white/5 text-muted'        :
+    s === 'read'    ? 'bg-veil/5 text-muted'        :
                       'bg-success/20 text-success'
   );
 
@@ -101,7 +101,7 @@ function ContactInboxContent() {
             key={f}
             onClick={() => setFilter(f)}
             className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition ${
-              filter === f ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'
+              filter === f ? 'bg-primary text-white' : 'bg-veil/5 text-muted hover:bg-veil/10'
             }`}
           >
             {f}
@@ -126,7 +126,7 @@ function ContactInboxContent() {
               className={`w-full text-left p-4 rounded-2xl border transition-all ${
                 selected?.id === item.id
                   ? 'bg-primary/10 border-primary/40'
-                  : 'bg-white/[0.02] border-white/10 hover:bg-white/[0.04] hover:border-white/20'
+                  : 'bg-veil/[0.02] border-veil/10 hover:bg-veil/[0.04] hover:border-veil/20'
               }`}
             >
               <div className="flex items-center justify-between gap-2 mb-1">

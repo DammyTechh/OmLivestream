@@ -2,24 +2,216 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THEME TOKENS
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Every colour is stored as three space-separated sRGB channels, not as a hex
+   string. That format is what lets Tailwind emit `rgb(var(--c-x) / <alpha>)`,
+   which is what keeps the `/opacity` modifiers working — `bg-surface/50`,
+   `text-text/90`, `border-primary/20` are all used across the product and all
+   of them break if a variable holds `#14102A` instead of `20 16 42`.
+
+   Light is the default: it lives on `:root` and needs no class. Dark is opt-in
+   via `.dark` on <html>. That ordering is deliberate — it means a visitor with
+   JavaScript disabled still gets the intended default rather than whichever
+   theme happened to be hardcoded.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: light;
+
+  /* Neutrals. Not grey — each carries a trace of the brand violet, which is
+     what stops the light theme reading as a generic admin panel. The page is
+     #F6F4FA: a 6/255 channel spread, roughly 2% chroma. Present enough to
+     feel related to the dark theme, far too little to read as lavender. */
+  --c-bg:       246 244 250;   /* #F6F4FA  page */
+  --c-surface:  255 255 255;   /* #FFFFFF  cards lift toward the light */
+  --c-elevated: 239 235 247;   /* #EFEBF7  insets and wells sit below the card */
+
+  /* A hairline derived from the text colour at 12%, pre-blended to an opaque
+     value. A border mixed from the brand violet instead comes out #DECFF7,
+     which reads as a lavender band rather than a division. */
+  --c-border:   220 217 226;   /* #DCD9E2 */
+
+  /* Text ramp, measured against the page: 16.3:1, 6.4:1, 4.9:1.
+     `subtle` is deliberately the quietest of the three, but it carries real
+     content — timestamps and captions at 10–11px — so it still has to clear
+     4.5:1. At the original #8B86A3 it managed 2.96:1 against `elevated`, i.e.
+     a hard fail on the one surface it most often sits on. The muted/subtle gap
+     narrows as a result; a third tier nobody can read is not a tier. */
+  --c-text:      26  19  48;   /* #1A1330  AAA  16.31:1 */
+  --c-muted:     91  85 115;   /* #5B5573  AA    6.43:1 */
+  --c-subtle:   109 104 133;   /* #6D6885  AA    4.85:1, 4.51:1 on elevated */
+
+  /* The brand ramp inverts between themes. #A855F7 is correct on near-black
+     but manages only 3.62:1 on this page, so it fails as a text or icon
+     colour. Deepening to #6D28D9 buys 6.51:1 against the page and 7.10:1 for
+     white sitting on it as a filled button. Same hue, same family, enough
+     weight to carry authority on white. */
+  --c-primary:      109  40 217;   /* #6D28D9 */
+  --c-primary-deep:  91  33 182;   /* #5B21B6 */
+  /* Accent is not deepened with the status hues. Its only text uses are two
+     icons, which need 3:1 rather than 4.5:1, and it clears that everywhere
+     (3.92:1 at worst); everything else is gradient fill carrying white text at
+     4.60:1. Taking it to pink-700 would dull the brand for no legibility. */
+  --c-accent:       219  39 119;   /* #DB2777 */
+
+  /* Status colours are re-cut too. The dark-theme values are unusable here:
+     #10B981 lands at 2.32:1 and #F59E0B at 1.97:1, i.e. illegible.
+
+     These sit one step deeper than the obvious light-mode choice, because the
+     product's status idiom is a tinted chip — `bg-danger/15 text-danger` — and
+     the tint lifts the background toward the text. Measured on the chip rather
+     than on the card, #DC2626 gives only 3.29:1; #991B1B gives 4.98:1. The
+     hue separation survives the deepening: danger and warning stay 20° apart
+     in CIELCh, ΔE 21, the same gap they had before. */
+  --c-success:   6  95  70;   /* #065F46  chip/20 4.80:1 */
+  --c-warning: 146  64  14;   /* #92400E  chip/20 4.47:1 */
+  --c-danger:  153  27  27;   /* #991B1B  chip/20 4.98:1 */
+
+  /* The admin user table escalates active → flagged → suspended → banned, so
+     it needs one step between amber and red. This existed as a raw
+     `text-orange-400`, which is 2.1:1 on white. Note the hue gaps are tight
+     here (45° against warning's 54° and danger's 34°) — much tighter than in
+     the dark theme, where the lighter, more saturated hues spread 73/55/31.
+     That is acceptable only because the chip also prints the status word, so
+     hue is reinforcement rather than the sole carrier of meaning. */
+  --c-severe:  154  52  18;   /* #9A3412  chip/15 4.95:1 */
+
+  /* The veil. `bg-white/5` is the product's idiom for a faintly raised panel,
+     used 118 times — and on a white card it composites to #FFFFFF, i.e. it
+     disappears. So the scrim colour flips polarity with the theme while the
+     alpha stays put. Verified in CIELAB rather than linear luminance: at
+     matched alpha the two directions differ by ~0.75x perceptually, close
+     enough that no call site needs its number retuned. */
+  --c-veil: 26 19 48;
+
+  /* Shadows. On a dark page a wide violet glow reads as light spill. On white
+     the same glow is just haze, so light mode gets a tighter, mostly neutral
+     shadow with only a hint of brand in it. */
+  --shadow-brand:       0 10px 30px -12px rgb(109 40 217 / 0.28);
+  --shadow-brand-hover: 0 18px 40px -14px rgb(109 40 217 / 0.36);
+  --shadow-card:        0 1px 2px rgb(26 19 48 / 0.04), 0 8px 24px -12px rgb(26 19 48 / 0.10);
+
+  /* Ambient artwork (WavyBackground). Tuned per theme rather than recoloured:
+     a wash that reads as light spill on near-black reads as muddy haze on
+     white, so on light everything is fainter, the hue is deeper so it does not
+     grey out at low opacity, and the grain switches to multiply because
+     overlay does almost nothing against white. */
+  --c-glow-a: 109  40 217;   /* deep violet, survives low opacity on white */
+  --c-glow-b:  91  33 182;
+  --c-glow-c: 219  39 119;
+  --glow-1-opacity: 0.10;
+  --glow-2-opacity: 0.07;
+  --wave-opacity:   0.55;
+  --wave-stop-1: 0.30;
+  --wave-stop-2: 0.16;
+  --wave-stop-3: 0.04;
+  --grain-opacity: 0.025;
+  --grain-blend: multiply;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --c-bg:       13  10  30;   /* #0D0A1E */
+  --c-surface:  20  16  42;   /* #14102A */
+  --c-elevated: 31  21  56;   /* #1F1538 */
+
+  /* Was rgba(124,58,237,0.2). Pre-blended so it can live in a channel
+     variable. Over the page that composites to #231447 and over a card to
+     #291851 — a 6/4/10 per-channel difference, not perceptible, so one opaque
+     value stands in for both without visible change. */
+  --c-border:   35  20  71;   /* #231447 */
+
+  --c-text:    248 245 255;   /* #F8F5FF */
+  --c-muted:   155 151 180;   /* #9B97B4 */
+  /* Lifted from #5C5878, which was a pre-existing failure in this theme too:
+     2.55–2.89:1 depending on the surface, for the same 10–11px timestamps the
+     light theme uses it for. #84809A clears 4.53:1 on the worst of the three. */
+  --c-subtle:  132 128 154;   /* #84809A */
+
+  --c-primary:      168  85 247;   /* #A855F7 */
+  --c-primary-deep: 124  58 237;   /* #7C3AED */
+  --c-accent:       236  72 153;   /* #EC4899 */
+
+  --c-success:  16 185 129;   /* #10B981 */
+  --c-warning: 245 158  11;   /* #F59E0B */
+  --c-danger:  239  68  68;   /* #EF4444 */
+  --c-severe:  251 146  60;   /* #FB923C  the orange-400 this replaces */
+
+  --c-veil: 255 255 255;
+
+  --shadow-brand:       0 10px 30px -10px rgb(168 85 247 / 0.5);
+  --shadow-brand-hover: 0 20px 40px -10px rgb(168 85 247 / 0.7);
+  --shadow-card:        0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
+
+  /* The original artwork values — brighter violet, stronger wash, overlay
+     grain. These are what the Figma design specified against near-black. */
+  --c-glow-a: 168  85 247;   /* #A855F7 */
+  --c-glow-b: 124  58 237;   /* #7C3AED */
+  --c-glow-c: 236  72 153;   /* #EC4899 */
+  --glow-1-opacity: 0.18;
+  --glow-2-opacity: 0.15;
+  --wave-opacity:   1;
+  --wave-stop-1: 0.35;
+  --wave-stop-2: 0.18;
+  --wave-stop-3: 0.05;
+  --grain-opacity: 0.035;
+  --grain-blend: overlay;
+}
+
 @layer base {
   html, body {
-    background: #0D0A1E;
-    color: #F8F5FF;
+    background: rgb(var(--c-bg));
+    color: rgb(var(--c-text));
     -webkit-font-smoothing: antialiased;
     font-feature-settings: "ss01", "cv11";
   }
-  ::selection { background: #A855F7; color: #fff; }
+
+  /* Colour transitions are worth having globally: without them, toggling the
+     theme snaps every surface at once, which reads as a glitch. Gated behind
+     .theme-ready so it cannot animate during the first paint, and limited to
+     colour properties so it never interferes with layout or with
+     framer-motion transforms. */
+  html.theme-ready body,
+  html.theme-ready body * {
+    transition: background-color 220ms ease, border-color 220ms ease,
+                color 220ms ease, fill 220ms ease, stroke 220ms ease;
+  }
+
+  ::selection { background: rgb(var(--c-primary)); color: #fff; }
 
   ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: #0D0A1E; }
-  ::-webkit-scrollbar-thumb { background: #7C3AED; border-radius: 999px; }
-  ::-webkit-scrollbar-thumb:hover { background: #A855F7; }
+  ::-webkit-scrollbar-track { background: rgb(var(--c-bg)); }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--c-primary) / 0.55);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-primary)); }
+
+  /* Firefox has no ::-webkit-scrollbar equivalent. */
+  * { scrollbar-color: rgb(var(--c-primary) / 0.55) rgb(var(--c-bg)); }
+
+  /* Quality floor: a focus ring that stays visible on either polarity. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-primary));
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html.theme-ready body,
+    html.theme-ready body * {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
 }
 
 @layer components {
   .input {
-    @apply w-full px-5 py-3.5 rounded-2xl bg-[#1F1538]/60 border border-primary/20 text-text;
+    @apply w-full px-5 py-3.5 rounded-2xl bg-elevated/60 border border-border text-text;
     @apply focus:border-primary/60 focus:outline-none focus:ring-2 focus:ring-primary/10;
     @apply transition-all placeholder:text-muted/70;
   }
@@ -30,19 +222,28 @@
 
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-semibold text-white;
-    @apply bg-primary hover:bg-primary/90 transition shadow-lg shadow-primary/25;
+    @apply bg-primary hover:bg-primary/90 transition shadow-brand;
   }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl font-medium;
-    @apply bg-white/5 border border-white/10 text-text hover:bg-white/10 hover:border-white/20 transition;
+    @apply bg-veil/5 border border-veil/10 text-text hover:bg-veil/10 hover:border-veil/20 transition;
   }
 
   .sidebar-link {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-muted transition-all;
-    @apply hover:bg-white/5 hover:text-text;
+    @apply hover:bg-veil/5 hover:text-text;
   }
   .sidebar-link.active {
-    @apply bg-primary/10 text-text border border-primary/20;
+    @apply bg-primary/10 text-primary border border-primary/20;
   }
+}
+
+/* Button.tsx sets `animation: gradient 6s ease infinite` inline on the primary
+   variant's gradient layer, but no such keyframe was ever defined — so that
+   animation has been silently dead. Defining it activates the slow drift the
+   component always intended. */
+@keyframes gradient {
+  0%, 100% { background-position:   0% 50%; }
+  50%      { background-position: 100% 50%; }
 }

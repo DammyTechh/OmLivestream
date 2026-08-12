@@ -72,7 +72,7 @@ function PaymentContent() {
                 </div>
 
                 {/* Security notice */}
-                <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20 mb-6">
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/5 border border-border mb-6">
                   <ShieldCheck size={18} className="text-primary shrink-0 mt-0.5" />
                   <div className="text-xs text-muted leading-relaxed">
                     For your security, your card details are entered directly on <strong className="text-text">Paystack's secure checkout page</strong> — they never touch our servers. Choose a payment method below to continue.
@@ -83,7 +83,7 @@ function PaymentContent() {
                 <button
                   onClick={() => paystackCheckout('google_pay')}
                   disabled={loading}
-                  className="w-full py-4 rounded-2xl bg-black text-white font-semibold mb-3 flex items-center justify-center gap-2 hover:bg-neutral-900 transition disabled:opacity-60 border border-white/10"
+                  className="w-full py-4 rounded-2xl bg-black text-white font-semibold mb-3 flex items-center justify-center gap-2 hover:bg-neutral-900 transition disabled:opacity-60 border border-veil/10"
                 >
                   {loadingMethod === 'google_pay'
                     ? 'Redirecting to Google Pay…'
@@ -107,7 +107,7 @@ function PaymentContent() {
                 </button>
 
                 {/* Discount code — restored */}
-                <div className="pt-5 border-t border-white/5">
+                <div className="pt-5 border-t border-veil/5">
                   <label className="label flex items-center gap-2">
                     <Tag size={13} className="text-primary" />
                     Have a waitlist code or discount?
@@ -137,11 +137,11 @@ function PaymentContent() {
               </p>
 
               <div className="space-y-3 mb-8">
-                <label className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition ${cycle === 'monthly' ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/[0.02]'}`}>
+                <label className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition ${cycle === 'monthly' ? 'border-primary bg-primary/10' : 'border-veil/10 bg-veil/[0.02]'}`}>
                   <input type="radio" checked={cycle === 'monthly'} onChange={() => setCycle('monthly')} className="accent-primary" />
                   <span className="flex-1 font-display font-semibold">{naira(price.monthly)} <span className="text-sm font-normal text-muted">/ month</span></span>
                 </label>
-                <label className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition ${cycle === 'annual' ? 'border-primary bg-primary/10' : 'border-white/10 bg-white/[0.02]'}`}>
+                <label className={`flex items-center gap-3 p-4 rounded-2xl border cursor-pointer transition ${cycle === 'annual' ? 'border-primary bg-primary/10' : 'border-veil/10 bg-veil/[0.02]'}`}>
                   <input type="radio" checked={cycle === 'annual'} onChange={() => setCycle('annual')} className="accent-primary" />
                   <span className="flex-1 font-display font-semibold">{naira(price.annual)} <span className="text-sm font-normal text-muted">/ year</span></span>
                   <span className="text-xs text-muted">12 × {naira(price.monthly)}</span>

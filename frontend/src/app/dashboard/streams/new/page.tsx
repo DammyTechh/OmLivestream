@@ -309,14 +309,19 @@ export default function NewStreamPage() {
               </div>
             )}
 
-            {/* Status overlay */}
+            {/* Status overlay.
+
+                These pills sit on the video preview, which is black in both
+                themes. So they keep literal white text and a white hairline
+                rather than the theme tokens — `text-muted` would resolve to a
+                near-black on light and vanish against the footage. */}
             <div className="absolute top-4 left-4 flex gap-2">
               {sourceMode === 'camera' && !cameraOn && (
-                <div className="px-3 py-1 rounded-full bg-black/70 text-xs text-muted border border-white/10">
+                <div className="px-3 py-1 rounded-full bg-black/70 text-xs text-white/70 border border-white/10">
                   Camera off
                 </div>
               )}
-              <div className="px-3 py-1 rounded-full bg-black/70 text-xs text-text border border-white/10 flex items-center gap-2">
+              <div className="px-3 py-1 rounded-full bg-black/70 text-xs text-white border border-white/10 flex items-center gap-2">
                 <Monitor size={11} /> Preview
               </div>
             </div>
@@ -327,7 +332,7 @@ export default function NewStreamPage() {
                 <button
                   onClick={cameraOn ? stopCamera : startCamera}
                   className={`w-12 h-12 rounded-full flex items-center justify-center transition shadow-lg ${
-                    cameraOn ? 'bg-white/10 hover:bg-white/20 text-text' : 'bg-primary hover:bg-primary/90 text-white'
+                    cameraOn ? 'bg-veil/10 hover:bg-veil/20 text-text' : 'bg-primary hover:bg-primary/90 text-white'
                   }`}
                   title={cameraOn ? 'Stop camera' : 'Start camera'}
                 >
@@ -337,7 +342,7 @@ export default function NewStreamPage() {
                   <button
                     onClick={toggleMic}
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition shadow-lg ${
-                      micOn ? 'bg-white/10 hover:bg-white/20 text-text' : 'bg-danger hover:bg-danger/90 text-white'
+                      micOn ? 'bg-veil/10 hover:bg-veil/20 text-text' : 'bg-danger hover:bg-danger/90 text-white'
                     }`}
                     title={micOn ? 'Mute mic' : 'Unmute mic'}
                   >
@@ -362,7 +367,7 @@ export default function NewStreamPage() {
                   if (m.mode !== 'camera' && cameraOn) stopCamera();
                 }}
                 className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition ${
-                  sourceMode === m.mode ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'
+                  sourceMode === m.mode ? 'bg-primary text-white' : 'bg-veil/5 text-muted hover:bg-veil/10'
                 }`}
               >
                 <m.Icon size={14} /> {m.label}
@@ -383,7 +388,7 @@ export default function NewStreamPage() {
                     key={f.id}
                     onClick={() => setFilter(f.id)}
                     className={`px-3 py-2 rounded-xl text-xs font-medium transition ${
-                      filter === f.id ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'
+                      filter === f.id ? 'bg-primary text-white' : 'bg-veil/5 text-muted hover:bg-veil/10'
                     }`}
                   >
                     {f.label}
@@ -407,7 +412,7 @@ export default function NewStreamPage() {
                     className={`aspect-square rounded-xl transition flex flex-col items-center justify-center gap-1 ${
                       avatar === a.id
                         ? 'bg-primary/20 ring-2 ring-primary text-text'
-                        : 'bg-white/5 hover:bg-white/10 text-muted hover:text-text'
+                        : 'bg-veil/5 hover:bg-veil/10 text-muted hover:text-text'
                     }`}
                   >
                     <a.Icon size={20} strokeWidth={1.5} />
@@ -442,7 +447,7 @@ export default function NewStreamPage() {
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                   netResult ? STATUS_STYLES[netResult.statusColor].chip
                             : netError ? 'bg-danger/15 text-danger'
-                                       : 'bg-white/5 text-muted'
+                                       : 'bg-veil/5 text-muted'
                 }`}>
                   {netError            ? <WifiOff size={16} />
                    : netRunning        ? <Activity size={16} className="animate-pulse" />
@@ -476,7 +481,7 @@ export default function NewStreamPage() {
                 seconds, so silence here reads as a hang. */}
             {netRunning && (
               <div className="mt-4">
-                <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div className="h-1.5 rounded-full bg-veil/5 overflow-hidden">
                   <motion.div
                     className="h-full rounded-full bg-primary"
                     animate={{ width: `${netProgress?.percent ?? 0}%` }}
@@ -500,7 +505,7 @@ export default function NewStreamPage() {
                     { label: 'Jitter',  value: `${netResult.jitterMs}`,              unit: 'ms'   },
                     { label: 'Loss',    value: `${netResult.packetLossPercent}`,     unit: '%'    },
                   ].map((m) => (
-                    <div key={m.label} className="rounded-xl bg-white/[0.03] border border-white/5 px-3 py-2">
+                    <div key={m.label} className="rounded-xl bg-veil/[0.03] border border-veil/5 px-3 py-2">
                       <div className="text-[10px] uppercase tracking-wide text-muted">{m.label}</div>
                       <div className="text-sm font-semibold tabular-nums">
                         {m.value}<span className="text-muted font-normal text-xs ml-0.5">{m.unit}</span>
@@ -510,7 +515,7 @@ export default function NewStreamPage() {
                 </div>
 
                 {/* Recommended tier */}
-                <div className="rounded-xl border border-primary/20 bg-primary/[0.06] px-4 py-3">
+                <div className="rounded-xl border border-border bg-primary/[0.06] px-4 py-3">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 size={13} className="text-primary shrink-0" />
                     <span className="text-sm font-semibold">{netResult.recommended.label}</span>
@@ -593,7 +598,7 @@ export default function NewStreamPage() {
                     className={`w-full p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
                       selected.includes(p.id)
                         ? 'border-primary bg-primary/10'
-                        : 'border-white/10 bg-white/[0.02] hover:border-white/20'
+                        : 'border-veil/10 bg-veil/[0.02] hover:border-veil/20'
                     }`}
                   >
                     <p.Icon size={18} />
@@ -601,7 +606,7 @@ export default function NewStreamPage() {
                   </button>
                   <button
                     onClick={() => setShowKeysFor(showKeysFor === p.id ? null : p.id)}
-                    className="absolute top-2 right-2 p-1 rounded-lg bg-white/5 hover:bg-white/10 text-muted"
+                    className="absolute top-2 right-2 p-1 rounded-lg bg-veil/5 hover:bg-veil/10 text-muted"
                     title="Enter stream key manually"
                   >
                     <Settings2 size={11} />

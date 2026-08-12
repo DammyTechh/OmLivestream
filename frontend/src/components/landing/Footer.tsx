@@ -16,7 +16,7 @@ const SOCIALS: { key: SocialKey; label: string; Icon: (p: { size?: number }) => 
 
 export function Footer() {
   return (
-    <footer className="border-t border-white/5 py-8 mt-12">
+    <footer className="border-t border-veil/5 py-8 mt-12">
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
           <Logo size="sm" />
@@ -29,7 +29,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="mt-8 pt-6 border-t border-veil/5 flex flex-col sm:flex-row items-center justify-between gap-4">
           {/* Official social profiles — the same six platforms a broadcaster
               connects to this product. A link renders only when a handle is
               set, so an unconfigured account disappears rather than 404s. */}

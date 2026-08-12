@@ -277,7 +277,7 @@ export default function PrivacyPage() {
       <section className="relative pb-24">
         <div className="mx-auto max-w-3xl px-6">
           {/* Quick navigation */}
-          <nav className="mb-12 rounded-2xl bg-[#14102A]/60 border border-primary/15 p-6">
+          <nav className="mb-12 rounded-2xl bg-surface/60 border border-border p-6">
             <p className="text-xs uppercase tracking-widest text-muted mb-4">On this page</p>
             <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
               {SECTIONS.map((s) => (

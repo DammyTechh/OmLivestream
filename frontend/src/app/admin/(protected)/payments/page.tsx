@@ -67,7 +67,7 @@ function PaymentsContent() {
       ) : (
         <Card className="!p-0 overflow-hidden">
           <table className="w-full">
-            <thead className="bg-white/[0.03]">
+            <thead className="bg-veil/[0.03]">
               <tr className="text-left text-xs uppercase tracking-widest text-muted">
                 <th className="py-3 px-5">User</th>
                 <th className="py-3 px-5">Amount</th>
@@ -77,7 +77,7 @@ function PaymentsContent() {
             </thead>
             <tbody>
               {payments.map((p) => (
-                <tr key={p.id} className="border-t border-border hover:bg-white/[0.02] transition">
+                <tr key={p.id} className="border-t border-border hover:bg-veil/[0.02] transition">
                   <td className="py-3 px-5 text-sm">{p.user_email ?? p.user_id.slice(0, 10)}</td>
                   <td className="py-3 px-5 font-medium">{formatCurrency(p.amount)}</td>
                   <td className="py-3 px-5">

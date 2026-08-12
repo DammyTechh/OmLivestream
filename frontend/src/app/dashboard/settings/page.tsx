@@ -139,7 +139,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Avatar upload */}
-          <div className="flex items-center gap-5 pb-5 border-b border-white/5">
+          <div className="flex items-center gap-5 pb-5 border-b border-veil/5">
             <div className="relative group">
               {profile.avatar_url ? (
                 <img src={profile.avatar_url} className="w-24 h-24 rounded-full object-cover border-2 border-primary/30" alt="" />
@@ -195,7 +195,7 @@ export default function SettingsPage() {
             />
           </div>
 
-          <div className="flex justify-end pt-2 border-t border-white/5">
+          <div className="flex justify-end pt-2 border-t border-veil/5">
             <Button onClick={saveProfile} loading={savingProfile} icon={<Save size={16} />}>
               Save Profile
             </Button>

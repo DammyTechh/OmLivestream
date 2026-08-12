@@ -106,7 +106,7 @@ function CodeRedeemBox({ onRedeemed }: { onRedeemed: () => void }) {
         <button
           onClick={() => handleValidate(input)}
           disabled={!input.trim() || validating}
-          className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-sm font-medium text-muted hover:bg-white/10 transition disabled:opacity-40 whitespace-nowrap"
+          className="px-4 py-2 rounded-xl bg-veil/5 border border-veil/10 text-sm font-medium text-muted hover:bg-veil/10 transition disabled:opacity-40 whitespace-nowrap"
         >
           {validating ? <Loader2 size={14} className="animate-spin" /> : 'Check'}
         </button>
@@ -159,7 +159,7 @@ function CodeRedeemBox({ onRedeemed }: { onRedeemed: () => void }) {
           </div>
 
           {/* Explanation */}
-          <p className="text-xs text-muted mt-3 pt-3 border-t border-white/10">
+          <p className="text-xs text-muted mt-3 pt-3 border-t border-veil/10">
             {isFree
               ? 'This code gives you one month of Premium free — no payment needed. Activate it and your access starts immediately.'
               : `This code takes ${preview?.discountPct ?? WAITLIST_DISCOUNT_PCT}% off each of your first ${WAITLIST_DISCOUNT_MONTHS} months. Enter it at checkout on the payment page.`}
@@ -250,7 +250,7 @@ function BillingContent() {
                 {codes.map((c) => (
                   <div
                     key={c.code}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-black/20 border border-white/10 px-4 py-3"
+                    className="flex items-center justify-between gap-3 rounded-xl bg-black/20 border border-veil/10 px-4 py-3"
                   >
                     <div className="min-w-0">
                       <div className="text-xs text-primary font-medium mb-1">{labelFor(c)}</div>
@@ -261,7 +261,7 @@ function BillingContent() {
                     </div>
                     <button
                       onClick={() => copyCode(c.code)}
-                      className="shrink-0 w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 flex items-center justify-center transition"
+                      className="shrink-0 w-8 h-8 rounded-lg bg-veil/[0.06] hover:bg-veil/[0.12] border border-veil/10 flex items-center justify-center transition"
                       aria-label="Copy code"
                     >
                       {copied === c.code

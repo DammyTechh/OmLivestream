@@ -65,18 +65,26 @@ export default function NotFound() {
                   404
                 </text>
 
-                {/* Offline chip, mirroring the LIVE chip elsewhere */}
+                {/* Offline chip, mirroring the LIVE chip elsewhere.
+                    Colours go through `style`, not through fill/stroke
+                    attributes: SVG presentation attributes do not reliably
+                    resolve var(), so the attribute form would keep the dark
+                    theme's navy chip on the light page. */}
                 <g>
                   <rect x="196" y="196" width="88" height="26" rx="13"
-                        fill="#14102A" stroke="rgba(124,58,237,0.35)" />
+                        style={{
+                          fill: 'rgb(var(--c-elevated))',
+                          stroke: 'rgb(var(--c-primary) / 0.35)',
+                        }} />
                   <motion.circle
-                    cx="214" cy="209" r="4" fill="#EF4444"
+                    cx="214" cy="209" r="4"
+                    style={{ fill: 'rgb(var(--c-danger))' }}
                     animate={{ opacity: [1, 0.25, 1] }}
                     transition={{ duration: 1.8, repeat: Infinity }}
                   />
                   <text x="228" y="209" dominantBaseline="central"
-                        fill="#9B97B4"
                         style={{
+                          fill: 'rgb(var(--c-muted))',
                           fontFamily: 'var(--font-jetbrains), monospace',
                           fontSize: 11, letterSpacing: '0.08em',
                         }}>

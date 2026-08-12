@@ -109,13 +109,13 @@ export default function AIStudioPage() {
       <div className="flex gap-2">
         <button
           onClick={() => setMode('chat')}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition ${mode === 'chat' ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition ${mode === 'chat' ? 'bg-primary text-white' : 'bg-veil/5 text-muted hover:bg-veil/10'}`}
         >
           <Bot size={14} className="inline mr-1.5" /> Chat
         </button>
         <button
           onClick={() => setMode('title')}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition ${mode === 'title' ? 'bg-primary text-white' : 'bg-white/5 text-muted hover:bg-white/10'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition ${mode === 'title' ? 'bg-primary text-white' : 'bg-veil/5 text-muted hover:bg-veil/10'}`}
         >
           <Wand2 size={14} className="inline mr-1.5" /> Title Generator
         </button>
@@ -134,7 +134,7 @@ export default function AIStudioPage() {
                     : <Sparkles size={14} className="text-white" />}
                 </div>
                 <div className={`max-w-md px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap ${
-                  m.role === 'user' ? 'bg-primary/20 text-text' : 'bg-white/5 text-text'
+                  m.role === 'user' ? 'bg-primary/20 text-text' : 'bg-veil/5 text-text'
                 }`}>
                   {m.content}
                 </div>
@@ -145,7 +145,7 @@ export default function AIStudioPage() {
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                   <Sparkles size={14} className="text-white animate-pulse" />
                 </div>
-                <div className="px-4 py-3 rounded-2xl bg-white/5 text-sm">
+                <div className="px-4 py-3 rounded-2xl bg-veil/5 text-sm">
                   <span className="inline-flex gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                     <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '0.2s' }} />
@@ -193,7 +193,7 @@ export default function AIStudioPage() {
                     onClick={() => setPlatforms((prev) =>
                       prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id])}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border ${
-                      on ? 'bg-primary/15 border-primary/40 text-text' : 'bg-white/5 border-white/10 text-muted hover:bg-white/10'
+                      on ? 'bg-primary/15 border-primary/40 text-text' : 'bg-veil/5 border-veil/10 text-muted hover:bg-veil/10'
                     }`}
                   >
                     {p.label}
@@ -220,7 +220,7 @@ export default function AIStudioPage() {
                 <button
                   key={i}
                   onClick={() => { navigator.clipboard.writeText(t); toast.success('Copied to clipboard'); }}
-                  className="w-full text-left p-3 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/10 hover:border-primary/30"
+                  className="w-full text-left p-3 rounded-xl bg-veil/5 hover:bg-veil/10 transition border border-veil/10 hover:border-primary/30"
                 >
                   {t}
                 </button>

@@ -14,7 +14,7 @@ function PlatformsVisual() {
     { name: 'Twitch',    Icon: TwitchIcon,    viewers: '2,067', pos: 'bottom-4 right-4 md:right-auto md:left-44'   },
   ];
   return (
-    <div className="relative w-full h-80 rounded-3xl bg-[#14102A]/70 border border-primary/20 p-5 overflow-hidden">
+    <div className="relative w-full h-80 rounded-3xl bg-surface/70 border border-border p-5 overflow-hidden">
       {tiles.map((t, i) => (
         <motion.div
           key={t.name}
@@ -23,7 +23,7 @@ function PlatformsVisual() {
           viewport={{ once: true }}
           transition={{ delay: i * 0.1 }}
           animate={{ y: [0, -4, 0] }}
-          className={`absolute ${t.pos} bg-[#1F1538] border border-primary/20 rounded-xl px-3 py-2 flex items-center gap-2.5 shadow-lg`}
+          className={`absolute ${t.pos} bg-elevated border border-border rounded-xl px-3 py-2 flex items-center gap-2.5 shadow-lg`}
           style={{ animationDelay: `${i * 0.5}s` }}
         >
           <t.Icon size={18} />
@@ -71,7 +71,7 @@ function ChatVisual() {
     { user: '@creator_kai', text: 'this is next level setup',  Icon: TikTokIcon,    platform: 'TikTok'    },
   ];
   return (
-    <div className="w-full rounded-3xl bg-[#14102A]/70 border border-primary/20 p-5 overflow-hidden">
+    <div className="w-full rounded-3xl bg-surface/70 border border-border p-5 overflow-hidden">
       <div className="text-[10px] uppercase tracking-widest text-muted mb-4 flex items-center gap-2">
         <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
         Live Comments — Reply per platform in real time
@@ -84,13 +84,13 @@ function ChatVisual() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.12 }}
-            className="flex items-start gap-3 p-2.5 rounded-xl bg-[#1F1538]/60"
+            className="flex items-start gap-3 p-2.5 rounded-xl bg-elevated/60"
           >
             <m.Icon size={16} />
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className="text-xs font-semibold">{m.user}</span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 text-muted">{m.platform}</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-veil/5 text-muted">{m.platform}</span>
               </div>
               <div className="text-xs text-muted truncate">{m.text}</div>
               <button className="text-[10px] text-primary mt-1 hover:underline">↩ Reply</button>
@@ -105,7 +105,7 @@ function ChatVisual() {
 // ── Visual 3: Stream quality / on-air dashboard ──
 function QualityVisual() {
   return (
-    <div className="relative w-full h-80 rounded-3xl bg-[#14102A]/70 border border-primary/20 p-6 overflow-hidden">
+    <div className="relative w-full h-80 rounded-3xl bg-surface/70 border border-border p-6 overflow-hidden">
       <div className="text-center mb-4">
         <motion.div
           animate={{ scale: [1, 1.05, 1] }}

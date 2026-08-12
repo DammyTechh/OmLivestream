@@ -83,10 +83,14 @@ export function WaitlistOfferPopup() {
               'bottom-5 right-5 w-[340px]',
               'sm:bottom-6 sm:right-6',
               'max-sm:left-4 max-sm:right-4 max-sm:bottom-4 max-sm:w-auto',
-              // Card style
+              // Card style. The background was a hardcoded #130d2a, which in
+              // light mode left a near-black panel with near-black text on it.
+              // The shadow was a fixed violet glow, which reads as light spill
+              // on a dark page and as haze on a white one — shadow-brand-lg is
+              // the same idea, cut per theme.
               'rounded-2xl border border-primary/30',
-              'bg-[#130d2a]/95 backdrop-blur-xl',
-              'shadow-[0_8px_40px_rgba(139,92,246,0.25)]',
+              'bg-surface/95 backdrop-blur-xl',
+              'shadow-brand-lg',
               'p-5',
             ].join(' ')}
           >
@@ -115,7 +119,7 @@ export function WaitlistOfferPopup() {
               {codes.map((c) => (
                 <div
                   key={c.code}
-                  className="flex items-center justify-between gap-3 rounded-xl bg-white/[0.04] border border-white/10 px-3 py-2.5"
+                  className="flex items-center justify-between gap-3 rounded-xl bg-veil/[0.04] border border-veil/10 px-3 py-2.5"
                 >
                   <div className="min-w-0">
                     <div className="text-xs text-primary font-medium mb-0.5">{labelFor(c)}</div>
@@ -123,11 +127,11 @@ export function WaitlistOfferPopup() {
                   </div>
                   <button
                     onClick={() => copyCode(c.code)}
-                    className="shrink-0 w-7 h-7 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 flex items-center justify-center transition"
+                    className="shrink-0 w-7 h-7 rounded-lg bg-veil/[0.06] hover:bg-veil/[0.12] border border-veil/10 flex items-center justify-center transition"
                     aria-label="Copy code"
                   >
                     {copied === c.code
-                      ? <Check size={13} className="text-green-400" />
+                      ? <Check size={13} className="text-success" />
                       : <Copy size={13} className="text-muted" />}
                   </button>
                 </div>

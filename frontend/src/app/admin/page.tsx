@@ -55,7 +55,7 @@ export default function AdminLoginPage() {
         </div>
 
         <Card className="p-8">
-          <div className="inline-flex items-center gap-2 mb-5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs text-primary">
+          <div className="inline-flex items-center gap-2 mb-5 px-3 py-1 rounded-full bg-primary/10 border border-border text-xs text-primary">
             <ShieldCheck size={12} /> Admin Portal
           </div>
           <h1 className="font-display text-3xl font-semibold tracking-tight mb-2">Admin Sign In</h1>

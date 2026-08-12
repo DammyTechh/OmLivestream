@@ -16,8 +16,8 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
 
 const variants: Record<Variant, string> = {
   primary: 'text-white shadow-[0_10px_30px_-10px_rgba(168,85,247,0.5)] hover:shadow-[0_20px_40px_-10px_rgba(168,85,247,0.7)]',
-  secondary: 'bg-white/5 border border-white/10 text-text hover:bg-white/10 hover:border-white/20',
-  ghost:     'text-muted hover:text-text hover:bg-white/5',
+  secondary: 'bg-veil/5 border border-veil/10 text-text hover:bg-veil/10 hover:border-veil/20',
+  ghost:     'text-muted hover:text-text hover:bg-veil/5',
   danger:    'bg-danger/10 text-danger border border-danger/20 hover:bg-danger/20',
 };
 
@@ -57,7 +57,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         />
       )}
       {loading ? (
-        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        <div className="w-5 h-5 border-2 border-veil/30 border-t-white rounded-full animate-spin" />
       ) : (
         <>
           {icon}
