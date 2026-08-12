@@ -28,9 +28,24 @@ const sizes: Record<Size, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'primary', size = 'md', loading, icon, children, className, disabled, ...rest },
+  { variant = 'primary', size = 'md', loading, icon, children, className, disabled, style, ...rest },
   ref
 ) {
+  // The gradient is the button's OWN background, not a separate `-z-10` layer.
+  // The old layer escaped the button's stacking context at rest (relative with
+  // no z-index / no transform creates none), so it painted behind the page and
+  // the button looked blank white — the gradient only snapped in once a hover
+  // transform gave the button a stacking context. Painting it directly means
+  // it's always there, in both themes, with the button's text sitting on top.
+  const primaryBg =
+    variant === 'primary'
+      ? {
+          background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 50%, #EC4899 100%)',
+          backgroundSize: '200% 200%',
+          animation: 'gradient 6s ease infinite',
+        }
+      : undefined;
+
   return (
     <motion.button
       ref={ref}
@@ -44,18 +59,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         variant === 'primary' && 'overflow-hidden',
         className
       )}
+      style={{ ...primaryBg, ...style }}
       {...rest}
     >
-      {variant === 'primary' && (
-        <span
-          className="absolute inset-0 -z-10"
-          style={{
-            background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 50%, #EC4899 100%)',
-            backgroundSize: '200% 200%',
-            animation: 'gradient 6s ease infinite',
-          }}
-        />
-      )}
       {loading ? (
         <div className="w-5 h-5 border-2 border-veil/30 border-t-white rounded-full animate-spin" />
       ) : (

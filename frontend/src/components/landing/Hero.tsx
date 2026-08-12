@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react';
 import { WavyBackground } from '@/components/ui/WavyBackground';
 import { SocialButtons } from '@/components/auth/SocialButtons';
 import { StreamGraphic } from '@/components/ui/StreamGraphic';
-import { YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon } from '@/components/ui/BrandIcons';
+import { YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon, XIcon, LinkedInIcon, KickIcon } from '@/components/ui/BrandIcons';
 import { TOKEN_KEYS } from '@/lib/api';
 
 const PLATFORMS = [
@@ -16,6 +16,9 @@ const PLATFORMS = [
   { name: 'Instagram', Icon: InstagramIcon },
   { name: 'TikTok',    Icon: TikTokIcon    },
   { name: 'Twitch',    Icon: TwitchIcon    },
+  { name: 'X',         Icon: XIcon         },
+  { name: 'LinkedIn',  Icon: LinkedInIcon  },
+  { name: 'Kick',      Icon: KickIcon      },
 ];
 
 export function Hero() {
