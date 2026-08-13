@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Users, Search, MoreVertical } from 'lucide-react';
+import { Users, Search, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { api, getApiError } from '@/lib/api';
@@ -19,14 +19,29 @@ function UsersContent() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { fetchUsers(); }, []);
 
+  /**
+   * This used to be try/finally with no catch. A failed request therefore left
+   * `users` as its initial empty array and rendered the ordinary "No users
+   * found" card — so a server error, an expired admin session and a genuinely
+   * empty table all looked identical, and the only clue was in the console.
+   * The failure is now caught and shown, with a way to retry.
+   */
   async function fetchUsers() {
     setLoading(true);
+    setError(null);
     try {
       const res = await api.get(`/admin/users?limit=50${q ? `&search=${encodeURIComponent(q)}` : ''}`);
-      setUsers(res.data?.data || []);
+      // Defensive about shape: the list may arrive bare or wrapped depending
+      // on which helper the route used.
+      const payload = res.data?.data ?? res.data;
+      setUsers(Array.isArray(payload) ? payload : payload?.data ?? []);
+    } catch (err) {
+      setError(getApiError(err, 'Could not load users.'));
+      setUsers([]);
     } finally { setLoading(false); }
   }
 
@@ -61,6 +76,18 @@ function UsersContent() {
 
       {loading ? (
         <Card className="h-40 flex items-center justify-center text-muted">Loading…</Card>
+      ) : error ? (
+        <Card className="py-14 text-center">
+          <AlertCircle size={40} className="text-danger mx-auto mb-4" />
+          <h3 className="font-display text-xl mb-1">Couldn&apos;t load users</h3>
+          <p className="text-muted text-sm mb-4">{error}</p>
+          <button
+            onClick={fetchUsers}
+            className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition"
+          >
+            Try again
+          </button>
+        </Card>
       ) : users.length === 0 ? (
         <Card className="py-14 text-center">
           <Users size={40} className="text-muted mx-auto mb-4" />

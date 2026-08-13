@@ -15,7 +15,10 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
 }
 
 const variants: Record<Variant, string> = {
-  primary: 'text-white shadow-[0_10px_30px_-10px_rgba(168,85,247,0.5)] hover:shadow-[0_20px_40px_-10px_rgba(168,85,247,0.7)]',
+  // A restrained shadow, not a neon bloom. The old one threw a 40px purple
+  // halo on hover, which on a light background looked like the button was lit
+  // from inside. This is a normal elevation shadow tinted with the brand.
+  primary:   'text-white shadow-[0_6px_16px_-8px_rgba(109,40,217,0.45)] hover:brightness-110 hover:shadow-[0_10px_22px_-10px_rgba(109,40,217,0.55)]',
   secondary: 'bg-veil/5 border border-veil/10 text-text hover:bg-veil/10 hover:border-veil/20',
   ghost:     'text-muted hover:text-text hover:bg-veil/5',
   danger:    'bg-danger/10 text-danger border border-danger/20 hover:bg-danger/20',
@@ -31,19 +34,16 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   { variant = 'primary', size = 'md', loading, icon, children, className, disabled, style, ...rest },
   ref
 ) {
-  // The gradient is the button's OWN background, not a separate `-z-10` layer.
-  // The old layer escaped the button's stacking context at rest (relative with
-  // no z-index / no transform creates none), so it painted behind the page and
-  // the button looked blank white — the gradient only snapped in once a hover
-  // transform gave the button a stacking context. Painting it directly means
-  // it's always there, in both themes, with the button's text sitting on top.
+  // A solid fill, not a gradient.
+  //
+  // This used to be an animated violet→purple→pink sweep. Three brand colours
+  // moving under the label is the kind of thing that reads as decoration
+  // rather than as a control — and because it never sits still, the eye keeps
+  // going back to it. A single flat primary with a normal hover state is what
+  // a production tool looks like, and it costs no animation frames.
   const primaryBg =
     variant === 'primary'
-      ? {
-          background: 'linear-gradient(135deg, #7C3AED 0%, #A855F7 50%, #EC4899 100%)',
-          backgroundSize: '200% 200%',
-          animation: 'gradient 6s ease infinite',
-        }
+      ? { background: 'rgb(var(--c-primary))' }
       : undefined;
 
   return (

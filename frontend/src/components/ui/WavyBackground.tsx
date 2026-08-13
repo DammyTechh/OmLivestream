@@ -21,9 +21,22 @@
  * `stopColor` attribute: SVG presentation attributes do not reliably resolve
  * var(), but inline CSS does.
  */
+/**
+ * Wave density. Was 45 strokes at 22px spacing; halving the count and widening
+ * the gap covers the same area for roughly half the paint cost, which is the
+ * difference between a smooth and a sticky scroll on a mid-range phone.
+ */
+const WAVE_COUNT = 24;
+const WAVE_GAP   = 41;
+
 export function WavyBackground({ className = '' }: { className?: string }) {
   return (
-    <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
+    <div
+      className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}
+      // Confine layout/paint work to this subtree so the ambient artwork can
+      // never invalidate the content sitting on top of it.
+      style={{ contain: 'paint' }}
+    >
       {/* Primary glow */}
       <div
         className="absolute left-1/4 top-1/3 w-[80vw] h-[80vw] rounded-full blur-[100px]"
@@ -35,7 +48,7 @@ export function WavyBackground({ className = '' }: { className?: string }) {
       />
       {/* Secondary glow, warmer, anchored bottom-left */}
       <div
-        className="absolute -left-32 -bottom-32 w-[60vw] h-[60vw] rounded-full blur-[120px]"
+        className="absolute -left-32 -bottom-32 w-[60vw] h-[60vw] rounded-full blur-[120px] hidden md:block"
         style={{
           opacity: 'var(--glow-2-opacity)',
           background: 'radial-gradient(circle at center, rgb(var(--c-glow-c)) 0%, transparent 70%)',
@@ -58,8 +71,8 @@ export function WavyBackground({ className = '' }: { className?: string }) {
           </linearGradient>
         </defs>
         <g style={{ opacity: 'var(--wave-opacity)' }}>
-          {Array.from({ length: 45 }).map((_, i) => {
-            const offset = i * 22;
+          {Array.from({ length: WAVE_COUNT }).map((_, i) => {
+            const offset = i * WAVE_GAP;
             return (
               <path
                 key={i}
@@ -69,7 +82,7 @@ export function WavyBackground({ className = '' }: { className?: string }) {
                 fill="none"
                 stroke="url(#waveGrad)"
                 strokeWidth="1"
-                opacity={Math.max(0.05, 0.7 - i * 0.015)}
+                opacity={Math.max(0.05, 0.7 - i * (0.015 * 45 / WAVE_COUNT))}
               />
             );
           })}
@@ -78,7 +91,7 @@ export function WavyBackground({ className = '' }: { className?: string }) {
 
       {/* Grain */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 hidden md:block"
         style={{
           opacity: 'var(--grain-opacity)',
           mixBlendMode: 'var(--grain-blend)' as React.CSSProperties['mixBlendMode'],

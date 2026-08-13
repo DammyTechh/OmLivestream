@@ -98,7 +98,7 @@ export function Navbar() {
                 </Link>
                 <button
                   onClick={logout}
-                  className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center font-semibold text-white text-sm hover:scale-105 transition"
+                  className="w-10 h-10 rounded-full bg-primary flex items-center justify-center font-semibold text-white text-sm hover:scale-105 transition"
                   title="Log out"
                 >
                   {userInitial ?? '?'}

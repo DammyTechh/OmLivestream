@@ -39,7 +39,7 @@ export function OnboardingBanner() {
           <X size={16} />
         </button>
         <div className="flex items-center gap-4 flex-wrap pr-8">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
             <Sparkles size={18} className="text-white" />
           </div>
           <div className="flex-1 min-w-0">

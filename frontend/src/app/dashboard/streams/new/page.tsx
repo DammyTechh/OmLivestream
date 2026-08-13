@@ -408,7 +408,7 @@ export default function NewStreamPage() {
                     <SwitchCamera size={18} />
                   </button>
                 )}
-                {cameraOn && (
+                {cameraOn && cam.profile.isDesktop && (
                   <button
                     onClick={toggleDual}
                     disabled={dualBusy}
@@ -422,7 +422,7 @@ export default function NewStreamPage() {
                     <PictureInPicture2 size={18} />
                   </button>
                 )}
-                {cameraOn && cam.layout === 'pip' && (
+                {cameraOn && cam.profile.isDesktop && cam.layout === 'pip' && (
                   <button
                     onClick={() => cam.swap()}
                     className="w-12 h-12 rounded-full flex items-center justify-center transition shadow-lg bg-veil/10 hover:bg-veil/20 text-text"
@@ -457,7 +457,7 @@ export default function NewStreamPage() {
           </Card>
 
           {/* Source tabs */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className={`grid gap-2 ${cam.profile.isDesktop ? 'grid-cols-3' : 'grid-cols-2'}`}>
             {[
               { mode: 'camera' as const, label: 'Camera',  Icon: Camera    },
               { mode: 'avatar' as const, label: 'Avatar',  Icon: UserIcon  },
@@ -493,7 +493,15 @@ export default function NewStreamPage() {
                 {([
                   { id: 'front', label: 'Front only',  hint: 'Selfie camera' },
                   { id: 'back',  label: 'Back only',   hint: 'Rear camera'   },
-                  { id: 'both',  label: 'Both',        hint: 'Picture-in-picture' },
+                  // Two simultaneous cameras is a desktop feature. On phones it
+                  // is unavailable on iOS outright and unreliable on Android,
+                  // and a picture-in-picture inset on a handset-sized frame is
+                  // cramped even where the hardware allows it — so rather than
+                  // offer a control that mostly fails, the option is simply not
+                  // there on mobile. Flip / front / back all still work.
+                  ...(cam.profile.isDesktop
+                    ? [{ id: 'both' as const, label: 'Both', hint: 'Picture-in-picture' }]
+                    : []),
                 ] as const).map((opt) => {
                   const activeFacing = cam.primarySource.kind === 'facing' ? cam.primarySource.facing : null;
                   const isActive =
@@ -588,7 +596,7 @@ export default function NewStreamPage() {
               )}
 
               {/* Honest capability note — set before they try, not after it fails. */}
-              {cam.layout !== 'pip' && cam.profile.dualCameraNote && (
+              {cam.profile.isDesktop && cam.layout !== 'pip' && cam.profile.dualCameraNote && (
                 <div className="flex items-start gap-2 text-[11px] text-muted leading-relaxed">
                   <Info size={12} className="mt-0.5 shrink-0" />
                   <span>{cam.profile.dualCameraNote}</span>

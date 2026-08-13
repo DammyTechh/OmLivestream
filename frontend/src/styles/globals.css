@@ -247,3 +247,26 @@
   0%, 100% { background-position:   0% 50%; }
   50%      { background-position: 100% 50%; }
 }
+
+/* ── Respect reduced motion ──────────────────────────────────────────
+   The app carries a fair amount of ambient movement: orbiting platform
+   icons, pulsing live dots, drifting glows, entrance transitions on almost
+   every card. That is fine as decoration and miserable as a requirement —
+   it costs battery on phones, and for anyone with vestibular sensitivity it
+   is actively unpleasant.
+
+   Honouring the OS-level "reduce motion" preference turns all of it off in
+   one place: animations and transitions collapse to a single frame rather
+   than being removed, so anything that animates *into* a visible state ends
+   up visible instead of stuck at opacity 0. Scroll behaviour goes back to
+   instant for the same reason. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

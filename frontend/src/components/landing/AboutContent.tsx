@@ -150,7 +150,7 @@ export function AboutContent() {
                 transition={{ delay: (i % 4) * 0.06 }}
                 className="group rounded-2xl bg-surface/60 border border-border p-6 hover:border-primary/40 transition-all"
               >
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center mb-5 shadow-lg">
+                <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center mb-5 shadow-lg">
                   <f.Icon size={20} className="text-white" />
                 </div>
                 <h3 className="font-display text-base font-semibold mb-2">{f.title}</h3>

@@ -127,7 +127,7 @@ export default function AIStudioPage() {
             {messages.map((m, i) => (
               <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                 <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center ${
-                  m.role === 'user' ? 'bg-primary/20' : 'bg-gradient-to-br from-primary to-accent'
+                  m.role === 'user' ? 'bg-primary/20' : 'bg-primary'
                 }`}>
                   {m.role === 'user'
                     ? <User size={14} className="text-primary" />
@@ -142,7 +142,7 @@ export default function AIStudioPage() {
             ))}
             {loading && (
               <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
                   <Sparkles size={14} className="text-white animate-pulse" />
                 </div>
                 <div className="px-4 py-3 rounded-2xl bg-veil/5 text-sm">

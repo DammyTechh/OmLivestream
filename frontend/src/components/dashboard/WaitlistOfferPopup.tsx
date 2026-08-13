@@ -105,7 +105,7 @@ export function WaitlistOfferPopup() {
 
             {/* Header */}
             <div className="flex items-center gap-3 mb-4 pr-6">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0">
                 <Gift size={18} className="text-white" />
               </div>
               <div>

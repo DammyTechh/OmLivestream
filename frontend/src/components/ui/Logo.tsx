@@ -5,14 +5,17 @@ import { cn } from '@/lib/utils';
 /**
  * The wordmark is live text, not a baked image, on purpose.
  *
- * The old logo.webp had "Omlive" set in a pale lavender that was tuned for the
- * near-black dark theme; on the light theme (#F6F4FA page, white cards) that
- * half of the lockup dropped to ~3:1 and effectively disappeared, leaving only
- * "Stream" legible. A raster can't be recoloured per theme, so the orb — the
- * one part that genuinely needs the artwork — is kept as a transparent mark
- * (logo-mark.webp, cropped from the original) and the wordmark is rendered as
- * text with a gradient built from the theme tokens. Same hue family in both
- * modes, always legible: primary→accent is 6.5:1+ on white and bright on dark.
+ * The old logo.webp had "Omlive" set in a pale lavender tuned for the near-black
+ * dark theme; on the light theme it dropped to ~3:1 and effectively disappeared,
+ * leaving only "Stream" legible. A raster can't be recoloured per theme, so the
+ * orb — the one part that genuinely needs artwork — is kept as a transparent
+ * mark (logo-mark.webp, cropped from the original) and the wordmark is set as
+ * text.
+ *
+ * Two solid colours rather than a gradient sweep: the text colour carries
+ * "Omlive" and the single brand violet picks out "Stream". A three-stop
+ * violet→pink gradient across a wordmark is the sort of thing that dates a
+ * product instantly, and it also read as muddy at small sizes.
  */
 export function Logo({
   className,
@@ -39,17 +42,16 @@ export function Logo({
         width={h * 2}
         height={h * 2}
         style={{ width: h, height: h }}
-        className="drop-shadow-[0_0_18px_rgba(168,85,247,0.35)] shrink-0"
+        className="shrink-0"
         priority
       />
       <span
         className={cn(
-          'font-bold tracking-tight leading-none whitespace-nowrap',
-          'bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent',
+          'font-semibold tracking-tight leading-none whitespace-nowrap text-text',
           text,
         )}
       >
-        OmliveStream
+        Omlive<span className="text-primary">Stream</span>
       </span>
     </span>
   );

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Radio, Eye, Heart, TrendingUp, Plus, Clock, Sparkles, ArrowRight, X } from 'lucide-react';
+import { Radio, Eye, Heart, TrendingUp, Plus, Clock, Sparkles, ArrowRight, ChevronRight, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -61,15 +61,15 @@ export default function DashboardHomePage() {
   }, []);
 
   const stats = [
-    { label: 'Total views',     value: overview.totalViews ?? 0,         icon: Eye,        color: 'from-primary to-accent' },
+    { label: 'Total views',     value: overview.totalViews ?? 0,         icon: Eye        },
     // Peak concurrent audience, not impressions: no live API this app reads
     // reports impressions, so that card could only ever have shown zero.
-    { label: 'Peak audience',   value: overview.peakViewers ?? 0,        icon: TrendingUp, color: 'from-blue-500 to-primary' },
-    { label: 'Comments',        value: overview.totalComments ?? 0,      icon: Heart,      color: 'from-accent to-danger' },
+    { label: 'Peak audience',   value: overview.peakViewers ?? 0,        icon: TrendingUp },
+    { label: 'Comments',        value: overview.totalComments ?? 0,      icon: Heart      },
     // The streams endpoint returns at most 5; counting the array here would
     // show "5" for any account with more. The overview RPC does not return a
     // stream count, so label this card for what it is.
-    { label: 'Recent streams',  value: recent.length,                    icon: Radio,      color: 'from-primary-deep to-primary' },
+    { label: 'Recent streams',  value: recent.length,                    icon: Radio      },
   ];
 
   return (
@@ -79,7 +79,7 @@ export default function DashboardHomePage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl bg-gradient-to-br from-primary/15 to-accent/10 border border-primary/30 p-6"
+          className="relative rounded-2xl bg-surface border border-border p-6"
         >
           <button
             onClick={() => setShowPrompt(false)}
@@ -89,7 +89,7 @@ export default function DashboardHomePage() {
             <X size={16} />
           </button>
           <div className="flex items-start gap-4 pr-8">
-            <div className="w-11 h-11 rounded-xl bg-primary/20 flex items-center justify-center shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Sparkles size={20} className="text-primary" />
             </div>
             <div className="flex-1">
@@ -127,9 +127,10 @@ export default function DashboardHomePage() {
         {stats.map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
             <Card className="p-5">
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center mb-4`}>
-                <s.icon size={18} className="text-white" />
-              </div>
+              {/* A quiet outlined glyph, not a coloured chip. Four saturated
+                  gradient tiles in a row turned a stats strip into a paint
+                  chart and gave each metric a hue that meant nothing. */}
+              <s.icon size={17} strokeWidth={1.75} className="text-muted mb-4" />
               <div className="font-display text-3xl font-semibold tracking-tight">
                 {loading
                   ? <span className="inline-block w-16 h-8 rounded bg-veil/5 animate-pulse align-middle" />
@@ -145,7 +146,7 @@ export default function DashboardHomePage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-xl font-semibold">Recent streams</h2>
-          <Link href="/dashboard/streams" className="text-sm text-primary hover:underline">View all →</Link>
+          <Link href="/dashboard/streams" className="text-sm text-primary hover:underline">View all</Link>
         </div>
 
         {loading ? (
@@ -183,7 +184,7 @@ export default function DashboardHomePage() {
                         </div>
                       </div>
                     </div>
-                    <span className="text-muted group-hover:text-text transition">→</span>
+                    <ChevronRight size={16} className="text-muted group-hover:text-text transition shrink-0" />
                   </div>
                 </Card>
               </Link>

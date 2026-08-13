@@ -7,37 +7,31 @@ const AI_CAPABILITIES = [
     Icon: Wand2,
     title: 'AI Title Generator',
     desc: 'Describe your stream, get 5 click-worthy titles optimized per platform.',
-    accent: 'from-purple-500 to-pink-500',
   },
   {
     Icon: Scissors,
     title: 'Smart Video Editing',
     desc: 'Trim dead space, add captions, remove backgrounds — all from a text prompt.',
-    accent: 'from-blue-500 to-purple-500',
   },
   {
     Icon: PenTool,
     title: 'Stream Descriptions',
     desc: 'Auto-generate SEO-friendly descriptions that drive discovery.',
-    accent: 'from-pink-500 to-orange-500',
   },
   {
     Icon: Hash,
     title: 'Hashtag Suggestions',
     desc: 'Trending, niche-specific hashtags for every platform instantly.',
-    accent: 'from-green-500 to-teal-500',
   },
   {
     Icon: FileVideo,
     title: 'Clip Highlights',
     desc: 'AI finds your best moments and exports them as short-form clips.',
-    accent: 'from-amber-500 to-red-500',
   },
   {
     Icon: Sparkles,
     title: 'Creative Assistant',
     desc: 'Chat for ideas, scripts, thumbnails — your 24/7 creative partner.',
-    accent: 'from-indigo-500 to-purple-500',
   },
 ];
 
@@ -79,9 +73,11 @@ export function AIFeatures() {
               whileHover={{ y: -4 }}
               className="group relative rounded-2xl bg-surface/60 border border-border p-6 hover:border-primary/40 transition-all overflow-hidden"
             >
-              <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br ${c.accent} opacity-10 blur-2xl group-hover:opacity-20 transition`} />
-              <div className={`relative w-11 h-11 rounded-xl bg-gradient-to-br ${c.accent} flex items-center justify-center mb-5 shadow-lg`}>
-                <c.Icon size={20} className="text-white" />
+              {/* One brand tint for every capability. Six different two-colour
+                  gradients turned a feature grid into a swatch book and implied
+                  a colour-coding that never existed. */}
+              <div className="relative w-11 h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-5">
+                <c.Icon size={20} className="text-primary" strokeWidth={1.75} />
               </div>
               <h3 className="relative font-display text-lg font-semibold mb-2">{c.title}</h3>
               <p className="relative text-sm text-muted leading-relaxed">{c.desc}</p>
@@ -94,7 +90,7 @@ export function AIFeatures() {
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mt-16 rounded-3xl bg-gradient-to-br from-primary/10 via-primary-deep/[0.06] to-accent/10 border border-primary/25 p-6 sm:p-8 md:p-10"
+          className="mt-16 rounded-3xl bg-surface border border-border p-6 sm:p-8 md:p-10"
         >
           <div className="grid md:grid-cols-2 gap-8 items-center">
             <div className="min-w-0">
@@ -130,7 +126,12 @@ export function AIFeatures() {
                   // float to the vertical middle of the block.
                   className="flex items-start gap-3 p-3 rounded-xl bg-elevated/60 border border-border text-sm"
                 >
-                  <Sparkles size={14} className="text-primary shrink-0 mt-[3px]" />
+                  {/* A quiet dot rather than a sparkle on every row. Five
+                      identical purple sparkles stacked down one column read as
+                      decoration, not information — the icon said nothing the
+                      list didn't already say, and repeating it was the loudest
+                      thing on the panel. */}
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0 mt-[7px]" />
                   {/* These titles used to be `truncate`, which on a 390px
                       screen left a ~31-character budget against titles of up
                       to 50 — so every one was cut mid-word, including the

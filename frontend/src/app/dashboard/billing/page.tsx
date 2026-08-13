@@ -229,10 +229,10 @@ function BillingContent() {
 
       {/* Waitlist reward banner */}
       {(showOffer || codes.length > 0) && !isPremium && (
-        <div className="rounded-2xl bg-gradient-to-br from-primary/20 via-accent/10 to-primary/5 border border-primary/40 p-6">
+        <div className="rounded-2xl bg-surface border border-border p-6">
           <div className="flex items-start gap-4 flex-wrap">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
-              <Gift size={20} className="text-white" />
+            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Gift size={20} className="text-primary" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
@@ -281,7 +281,7 @@ function BillingContent() {
       )}
 
       {/* Current plan card */}
-      <Card className={`p-8 ${isPremium ? 'bg-gradient-to-br from-primary/15 to-accent/10 border-primary/40' : ''}`}>
+      <Card className={`p-8 ${isPremium ? 'border-primary/40' : ''}`}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -309,6 +309,35 @@ function BillingContent() {
 
       {/* Smart code redemption box — only for free users */}
       {!isPremium && <CodeRedeemBox onRedeemed={handleRedeemed} />}
+
+      {/* Payment method.
+          
+          Every payment affordance on this page used to be gated behind
+          `!isPremium`. Redeeming a one-month-free code flips the account to
+          premium, which removed the upgrade button, the code box and with them
+          the only route to a card form — so a creator on a complimentary month
+          had no way to put billing in place before it lapsed. This section is
+          for exactly that case: it stays available once someone is premium. */}
+      {isPremium && (
+        <Card className="p-6">
+          <div className="flex items-start gap-4 flex-wrap">
+            <div className="w-11 h-11 rounded-xl bg-veil/[0.06] border border-border flex items-center justify-center shrink-0">
+              <CreditCard size={19} className="text-muted" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display text-lg font-semibold mb-1">Payment method</h2>
+              <p className="text-sm text-muted mb-4 max-w-xl">
+                Add a card to keep Premium running without interruption. If your access came from a
+                free month or a reward code, adding a card now means it simply continues when that
+                period ends rather than lapsing.
+              </p>
+              <Link href="/payment?plan=premium">
+                <Button variant="secondary" icon={<CreditCard size={16} />}>Add a payment method</Button>
+              </Link>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Invoices */}
       <div>
@@ -338,7 +367,7 @@ function BillingContent() {
                       {inv.status}
                     </span>
                     {inv.receipt_url && (
-                      <a href={inv.receipt_url} target="_blank" className="text-xs text-primary hover:underline">Receipt →</a>
+                      <a href={inv.receipt_url} target="_blank" className="text-xs text-primary hover:underline">Receipt</a>
                     )}
                   </div>
                 </div>

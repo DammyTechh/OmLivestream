@@ -144,7 +144,7 @@ export default function SettingsPage() {
               {profile.avatar_url ? (
                 <img src={profile.avatar_url} className="w-24 h-24 rounded-full object-cover border-2 border-primary/30" alt="" />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white text-3xl font-semibold border-2 border-primary/30">
+                <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white text-3xl font-semibold border-2 border-primary/30">
                   {(profile.full_name?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}
                 </div>
               )}

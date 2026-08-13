@@ -68,7 +68,7 @@ export function TopBar() {
               {user?.avatar_url ? (
                 <img src={user.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center font-semibold text-white">
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center font-semibold text-white">
                   {initial}
                 </div>
               )}
