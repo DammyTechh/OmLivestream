@@ -151,7 +151,7 @@ export function StreamGraphic({ className }: { className?: string }) {
                   duration: 4, repeat: Infinity, ease: 'easeInOut',
                   delay: i * 0.4,
                 }}
-                className="w-14 h-14 rounded-2xl bg-[#14102A]
+                className="w-14 h-14 rounded-2xl bg-[#14102A] text-white
                            border border-primary/25 flex items-center justify-center
                            shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
                 title={label}

@@ -21,6 +21,8 @@ export interface User {
   trial_expires_at?: string | null;
   waitlist_member?: boolean;
   waitlist_reward_claimed?: boolean;
+  /** Login sessions the first-run dashboard tour has played in (capped at 3). */
+  tour_views?: number;
   created_at?: string;
 }
 

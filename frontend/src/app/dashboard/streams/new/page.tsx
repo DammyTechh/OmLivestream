@@ -9,6 +9,7 @@ import {
   Radio, Upload, Wifi, WifiOff, Settings2, Sparkles, Monitor,
   Gauge, RefreshCw, AlertTriangle, CheckCircle2, Activity,
   Gamepad2, Palette, Clapperboard, Headphones, Music, Flame, Presentation,
+  SwitchCamera, PictureInPicture2, Repeat2, Info,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
@@ -19,6 +20,8 @@ import {
   YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon, XIcon, LinkedInIcon, KickIcon,
 } from '@/components/ui/BrandIcons';
 import { measureNetwork, type Progress, type RawMeasurement } from '@/lib/network-test';
+import { useMultiCam, type CamSource } from '@/hooks/useMultiCam';
+import { VirtualCameraTip } from '@/components/dashboard/VirtualCameraTip';
 
 type SourceMode = 'camera' | 'avatar' | 'image';
 type Filter = 'none' | 'grayscale' | 'sepia' | 'cool' | 'warm' | 'vivid';
@@ -107,7 +110,18 @@ export default function NewStreamPage() {
 
   // Source mode + A/V state
   const [sourceMode, setSourceMode] = useState<SourceMode>('camera');
-  const [cameraOn, setCameraOn] = useState(false);
+
+  /**
+   * Camera capture — one camera, or front and back together as
+   * picture-in-picture. The hook owns the tracks and hands back a single
+   * composited stream, so everything below this line sees one video source
+   * regardless of how many cameras are actually open.
+   */
+  const cam = useMultiCam({ audio: true });
+  const cameraOn = cam.running;
+  const [dualBusy, setDualBusy] = useState(false);
+  const [showCamTip, setShowCamTip] = useState(true);
+
   // Also guard while user is actively previewing camera — accidental refresh = lost work
   useLiveStreamGuard(cameraOn);
   const [micOn, setMicOn] = useState(true);
@@ -126,43 +140,74 @@ export default function NewStreamPage() {
   const [streamKey, setStreamKey]     = useState({ rtmpUrl: '', streamKey: '' });
 
   // ─── Camera / Mic management ────────────────────────────────────
+  // The hook owns capture and cleanup; these are thin wrappers that keep the
+  // existing UI contract (start / stop / mute) and surface errors as toasts.
   const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
-        audio: micOn,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      setCameraOn(true);
-    } catch (err: any) {
-      toast.error(
-        err?.name === 'NotAllowedError'
-          ? 'Please allow camera access to preview your stream.'
-          : 'Could not access your camera — check your device permissions.'
-      );
-    }
+    const ok = await cam.start();
+    if (!ok && cam.error) return toast.error(cam.error);
+    // The hook always captures audio so the mic can be unmuted later without
+    // re-prompting; honour the creator's current toggle straight away.
+    cam.setMicEnabled(micOn);
   };
 
   const stopCamera = () => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    cam.stop();
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
-    setCameraOn(false);
   };
 
   const toggleMic = () => {
     const next = !micOn;
     setMicOn(next);
-    streamRef.current?.getAudioTracks().forEach((t) => { t.enabled = next; });
+    cam.setMicEnabled(next);
   };
 
+  /** Point the big picture at the other camera (front ⇆ back, or next device). */
+  const flipCamera = async () => {
+    let target: CamSource;
+    if (cam.primarySource.kind === 'facing') {
+      target = { kind: 'facing', facing: cam.primarySource.facing === 'user' ? 'environment' : 'user' };
+    } else {
+      const list = cam.devices;
+      const i = list.findIndex((d) => d.deviceId === (cam.primarySource as { deviceId: string }).deviceId);
+      const nextDev = list[(i + 1) % Math.max(list.length, 1)];
+      if (!nextDev) return;
+      target = { kind: 'device', deviceId: nextDev.deviceId };
+    }
+    const ok = await cam.switchPrimary(target);
+    if (!ok && cam.error) toast.error(cam.error);
+  };
+
+  /** Turn the second camera on or off. Failure keeps the first camera running. */
+  const toggleDual = async () => {
+    if (dualBusy) return;
+    setDualBusy(true);
+    try {
+      if (cam.layout === 'pip') {
+        cam.disableDual();
+      } else {
+        const ok = await cam.enableDual();
+        if (!ok) toast.error(cam.dualError ?? 'Couldn\'t start the second camera.');
+        else toast.success('Both cameras are live.');
+      }
+    } finally {
+      setDualBusy(false);
+    }
+  };
+
+  // Keep the preview element pointed at whatever the hook is currently
+  // producing — the raw camera in single mode, the composited canvas in dual.
   useEffect(() => {
-    // Stop camera on unmount
-    return () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-  }, []);
+    if (videoRef.current) videoRef.current.srcObject = cam.outputStream;
+    streamRef.current = cam.outputStream;
+  }, [cam.outputStream]);
+
+  // Leaving camera mode should release the hardware rather than leave the
+  // capture light on behind an avatar or a static image.
+  useEffect(() => {
+    if (sourceMode !== 'camera' && cam.running) cam.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceMode]);
 
   // ─── Network pre-flight check ──────────────────────────────────
   /**
@@ -324,6 +369,11 @@ export default function NewStreamPage() {
               <div className="px-3 py-1 rounded-full bg-black/70 text-xs text-white border border-white/10 flex items-center gap-2">
                 <Monitor size={11} /> Preview
               </div>
+              {sourceMode === 'camera' && cameraOn && cam.layout === 'pip' && (
+                <div className="px-3 py-1 rounded-full bg-primary/80 text-xs text-white border border-white/20 flex items-center gap-2">
+                  <PictureInPicture2 size={11} /> Both cameras
+                </div>
+              )}
             </div>
 
             {/* Camera controls — overlaid on preview */}
@@ -349,6 +399,59 @@ export default function NewStreamPage() {
                     {micOn ? <Mic size={18} /> : <MicOff size={18} />}
                   </button>
                 )}
+                {cameraOn && (
+                  <button
+                    onClick={flipCamera}
+                    className="w-12 h-12 rounded-full flex items-center justify-center transition shadow-lg bg-veil/10 hover:bg-veil/20 text-text"
+                    title="Switch camera"
+                  >
+                    <SwitchCamera size={18} />
+                  </button>
+                )}
+                {cameraOn && (
+                  <button
+                    onClick={toggleDual}
+                    disabled={dualBusy}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition shadow-lg disabled:opacity-60 ${
+                      cam.layout === 'pip'
+                        ? 'bg-primary hover:bg-primary/90 text-white'
+                        : 'bg-veil/10 hover:bg-veil/20 text-text'
+                    }`}
+                    title={cam.layout === 'pip' ? 'Use one camera' : 'Use both cameras'}
+                  >
+                    <PictureInPicture2 size={18} />
+                  </button>
+                )}
+                {cameraOn && cam.layout === 'pip' && (
+                  <button
+                    onClick={() => cam.swap()}
+                    className="w-12 h-12 rounded-full flex items-center justify-center transition shadow-lg bg-veil/10 hover:bg-veil/20 text-text"
+                    title="Swap which camera is large"
+                  >
+                    <Repeat2 size={18} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Corner picker — only meaningful while two cameras are running. */}
+            {sourceMode === 'camera' && cameraOn && cam.layout === 'pip' && (
+              <div className="absolute top-4 right-4 flex flex-col gap-1.5">
+                <div className="text-[10px] text-white/60 text-right pr-0.5">Inset</div>
+                <div className="grid grid-cols-2 gap-1">
+                  {(['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const).map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => cam.setPipCorner(c)}
+                      aria-label={`Move inset to ${c.replace('-', ' ')}`}
+                      className={`w-5 h-5 rounded-md border transition ${
+                        cam.pipCorner === c
+                          ? 'bg-primary border-primary'
+                          : 'bg-black/50 border-white/25 hover:border-white/60'
+                      }`}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </Card>
@@ -374,6 +477,138 @@ export default function NewStreamPage() {
               </button>
             ))}
           </div>
+
+          {/* ── Camera setup ──────────────────────────────────────────
+              Which camera fills the frame, and whether a second one runs
+              alongside it. Only meaningful in camera mode. */}
+          {sourceMode === 'camera' && (
+            <Card className="p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <SwitchCamera size={14} className="text-primary" />
+                <h3 className="text-sm font-semibold">Camera setup</h3>
+              </div>
+
+              {/* Layout choice */}
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: 'front', label: 'Front only',  hint: 'Selfie camera' },
+                  { id: 'back',  label: 'Back only',   hint: 'Rear camera'   },
+                  { id: 'both',  label: 'Both',        hint: 'Picture-in-picture' },
+                ] as const).map((opt) => {
+                  const activeFacing = cam.primarySource.kind === 'facing' ? cam.primarySource.facing : null;
+                  const isActive =
+                    opt.id === 'both' ? cam.layout === 'pip'
+                      : cam.layout === 'single' && (
+                          opt.id === 'front' ? activeFacing === 'user' : activeFacing === 'environment'
+                        );
+                  return (
+                    <button
+                      key={opt.id}
+                      disabled={dualBusy}
+                      onClick={async () => {
+                        if (opt.id === 'both') {
+                          if (cam.layout === 'pip') return;
+                          if (!cam.running) {
+                            const ok = await cam.start();
+                            if (!ok) return toast.error(cam.error ?? 'Could not access your camera.');
+                          }
+                          return toggleDual();
+                        }
+                        if (cam.layout === 'pip') cam.disableDual();
+                        const facing = opt.id === 'front' ? 'user' as const : 'environment' as const;
+                        if (!cam.running) {
+                          const ok = await cam.start({ kind: 'facing', facing });
+                          if (!ok) toast.error(cam.error ?? 'Could not access your camera.');
+                          return;
+                        }
+                        const ok = await cam.switchPrimary({ kind: 'facing', facing });
+                        if (!ok) toast.error(cam.error ?? 'Could not switch camera.');
+                      }}
+                      className={`px-3 py-2.5 rounded-xl text-left transition disabled:opacity-60 ${
+                        isActive ? 'bg-primary text-white' : 'bg-veil/5 hover:bg-veil/10 text-text'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold">{opt.label}</div>
+                      <div className={`text-[10px] mt-0.5 ${isActive ? 'text-white/70' : 'text-muted'}`}>
+                        {opt.hint}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Named device pickers — computers usually have several cameras,
+                  and the labels only exist once permission has been granted. */}
+              {cam.devices.length > 1 && cam.devices.some((d) => d.deviceId) && (
+                <div className="space-y-2">
+                  <label className="text-xs text-muted">Main camera</label>
+                  <select
+                    value={cam.primarySource.kind === 'device' ? cam.primarySource.deviceId : ''}
+                    onChange={async (e) => {
+                      const id = e.target.value;
+                      if (!id) return;
+                      const ok = cam.running
+                        ? await cam.switchPrimary({ kind: 'device', deviceId: id })
+                        : await cam.start({ kind: 'device', deviceId: id });
+                      if (!ok) toast.error(cam.error ?? 'Could not switch camera.');
+                    }}
+                    className="w-full px-3 py-2 rounded-xl bg-veil/[0.04] border border-veil/10 text-sm focus:border-primary/60 focus:outline-none"
+                  >
+                    <option value="">
+                      {cam.primarySource.kind === 'facing'
+                        ? `Automatic (${cam.primarySource.facing === 'user' ? 'front' : 'back'})`
+                        : 'Select a camera'}
+                    </option>
+                    {cam.devices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+                    ))}
+                  </select>
+
+                  {cam.layout === 'pip' && (
+                    <>
+                      <label className="text-xs text-muted">Inset camera</label>
+                      <select
+                        value={cam.secondarySource?.kind === 'device' ? cam.secondarySource.deviceId : ''}
+                        onChange={async (e) => {
+                          const id = e.target.value;
+                          if (!id) return;
+                          const ok = await cam.enableDual({ kind: 'device', deviceId: id });
+                          if (!ok) toast.error(cam.dualError ?? 'Could not switch the inset camera.');
+                        }}
+                        className="w-full px-3 py-2 rounded-xl bg-veil/[0.04] border border-veil/10 text-sm focus:border-primary/60 focus:outline-none"
+                      >
+                        <option value="">Automatic</option>
+                        {cam.devices.map((d) => (
+                          <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Honest capability note — set before they try, not after it fails. */}
+              {cam.layout !== 'pip' && cam.profile.dualCameraNote && (
+                <div className="flex items-start gap-2 text-[11px] text-muted leading-relaxed">
+                  <Info size={12} className="mt-0.5 shrink-0" />
+                  <span>{cam.profile.dualCameraNote}</span>
+                </div>
+              )}
+
+              {cam.dualError && (
+                <div className="flex items-start gap-2 text-[11px] text-warning leading-relaxed">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                  <span>{cam.dualError}</span>
+                </div>
+              )}
+
+              {/* Desktop only: virtual camera software lifts the ceiling past
+                  the two cameras a browser can open on its own. */}
+              {cam.profile.isDesktop && showCamTip && (
+                <VirtualCameraTip onDismiss={() => setShowCamTip(false)} />
+              )}
+            </Card>
+          )}
 
           {/* Source-specific settings */}
           {sourceMode === 'camera' && cameraOn && (

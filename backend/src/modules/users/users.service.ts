@@ -21,7 +21,7 @@ import { NotFoundError, ValidationError } from '../../utils/errors';
 const PROFILE_COLUMNS =
   'id,email,full_name,dob,location,avatar_url,plan,is_verified,status,' +
   'waitlist_member,waitlist_reward_claimed,trial_expires_at,' +
-  'last_stream_ended_at,created_at,updated_at,' +
+  'last_stream_ended_at,created_at,updated_at,tour_views,' +
   'onboarding_responses(completed_at)';
 
 export class UsersService {
@@ -147,6 +147,51 @@ export class UsersService {
   // Legacy single-call onboarding (kept for compatibility)
   async saveOnboarding(userId: string, payload: { heard_from: string[]; use_case: string[] }) {
     return this.saveOnboardingSurvey(userId, payload);
+  }
+
+  /**
+   * The first-run dashboard walkthrough is shown for a user's first few login
+   * sessions and then retires itself. `tour_views` counts how many sessions it
+   * has played in; the frontend calls this once per session while the tour is
+   * still active. The cap lives here so the ceiling is enforced server-side
+   * regardless of what the client sends.
+   *
+   * Read-then-write rather than an atomic `least(tour_views+1, 3)`: it is a
+   * single-user, once-per-session call with no contention, and this keeps the
+   * change to a plain column with no new SQL function to deploy. Defensive
+   * against the column not existing yet (pre-migration) — it degrades to 0
+   * rather than throwing on the app's most safety-critical table.
+   */
+  async recordTourView(userId: string): Promise<number> {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('users').select('tour_views').eq('id', userId).single();
+      if (error || !data) return 0;
+
+      const current = typeof data.tour_views === 'number' ? data.tour_views : 0;
+      const next = Math.min(current + 1, 3);
+      if (next !== current) {
+        await supabaseAdmin.from('users')
+          .update({ tour_views: next, updated_at: new Date().toISOString() })
+          .eq('id', userId);
+      }
+      return next;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * "Skip all tips" — retire the walkthrough for good by pinning the counter to
+   * its cap, so it never plays again on any device.
+   */
+  async dismissTour(userId: string): Promise<number> {
+    try {
+      await supabaseAdmin.from('users')
+        .update({ tour_views: 3, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+    } catch { /* non-fatal — the client also stops locally */ }
+    return 3;
   }
 
   async getSubscription(userId: string) {

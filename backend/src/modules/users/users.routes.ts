@@ -99,6 +99,31 @@ export async function usersRoutes(fastify: FastifyInstance): Promise<void> {
     sendNoContent(reply);
   });
 
+  // ── Dashboard walkthrough counter ────────────────────────────────
+  // The first-run tour plays for a user's first three login sessions. The
+  // client calls these; the cap is enforced in the service.
+  fastify.post('/me/tour/viewed', {
+    schema: {
+      tags: ['Users'],
+      summary: 'Record that the first-run dashboard tour played this session (capped at 3)',
+      security: [{ bearerAuth: [] }],
+      response: { 200: { type: 'object', properties: { success: { type: 'boolean' }, data: { type: 'object', properties: { tour_views: { type: 'integer' } } } } } },
+    },
+  }, async (req, reply) => {
+    sendSuccess(reply, { tour_views: await svc.recordTourView(getAuthUser(req).id) });
+  });
+
+  fastify.post('/me/tour/dismiss', {
+    schema: {
+      tags: ['Users'],
+      summary: 'Permanently dismiss the dashboard tour ("Skip all tips")',
+      security: [{ bearerAuth: [] }],
+      response: { 200: { type: 'object', properties: { success: { type: 'boolean' }, data: { type: 'object', properties: { tour_views: { type: 'integer' } } } } } },
+    },
+  }, async (req, reply) => {
+    sendSuccess(reply, { tour_views: await svc.dismissTour(getAuthUser(req).id) });
+  });
+
   // ══════════════════════════════════════════════════════════════
   //  ONBOARDING FLOW — 3 Steps after first sign-in
   // ══════════════════════════════════════════════════════════════

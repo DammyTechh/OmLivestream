@@ -5,6 +5,8 @@ import { Search, User as UserIcon, LogOut, Settings, CreditCard, ChevronDown } f
 import { useAuth } from '@/store/auth';
 import { useState, useEffect, useRef } from 'react';
 import { NotificationBell } from './NotificationBell';
+import { MobileNav } from './MobileNav';
+import { Logo } from '@/components/ui/Logo';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 export function TopBar() {
@@ -30,8 +32,17 @@ export function TopBar() {
 
   return (
     <div className="sticky top-0 z-30 bg-bg/80 backdrop-blur-xl border-b border-border">
-      <div className="px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3 sm:gap-4">
+        {/* Mobile only: menu trigger + a moderate logo. On lg+ the sidebar owns
+            both the navigation and the logo, so this whole cluster disappears. */}
+        <div className="flex items-center gap-1.5 lg:hidden shrink-0">
+          <MobileNav />
+          <Logo size="sm" />
+        </div>
+
+        {/* Search takes the space on desktop; hidden on mobile so the logo and
+            menu button aren't crowded off the row. */}
+        <div className="relative flex-1 max-w-md hidden md:block">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
           <input
             placeholder="Search streams, recordings, platforms…"
@@ -47,6 +58,7 @@ export function TopBar() {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((v) => !v)}
+              data-tour="profile"
               className="flex items-center gap-3 pl-3 border-l border-border hover:opacity-90 transition"
             >
               <div className="text-right hidden sm:block">

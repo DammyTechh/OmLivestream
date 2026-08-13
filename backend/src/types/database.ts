@@ -56,10 +56,11 @@ export interface Database {
           last_stream_ended_at:    string | null;
           re_engagement_sent_at:   string | null;
           birthday_wished_at:      string | null;
+          tour_views:              number;
           created_at:              string;
           updated_at:              string;
         };
-        Insert: Omit<Database['public']['Tables']['users']['Row'], 'created_at' | 'updated_at'> & { created_at?: string; updated_at?: string };
+        Insert: Omit<Database['public']['Tables']['users']['Row'], 'created_at' | 'updated_at' | 'tour_views'> & { created_at?: string; updated_at?: string; tour_views?: number };
         Update: Partial<Database['public']['Tables']['users']['Insert']>;
       };
 

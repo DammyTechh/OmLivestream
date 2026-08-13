@@ -1,29 +1,16 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Radio, Video, Link2, BarChart3, CreditCard, Settings, LifeBuoy, LogOut, Sparkles, Bot } from 'lucide-react';
+import { LogOut, Sparkles } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/store/auth';
 import { cn } from '@/lib/utils';
-
-const NAV = [
-  { href: '/dashboard',            label: 'Overview',    icon: LayoutDashboard },
-  { href: '/dashboard/streams',    label: 'Go Live',     icon: Radio          },
-  { href: '/dashboard/recordings', label: 'Recordings',  icon: Video          },
-  { href: '/dashboard/platforms',  label: 'Platforms',   icon: Link2          },
-  { href: '/dashboard/analytics',  label: 'Analytics',   icon: BarChart3      },
-  { href: '/dashboard/ai',         label: 'AI Studio',   icon: Bot            },
-  { href: '/dashboard/billing',    label: 'Billing',     icon: CreditCard     },
-  { href: '/dashboard/settings',   label: 'Settings',    icon: Settings       },
-];
+import { DASHBOARD_NAV, isNavActive } from './nav-items';
 
 export function Sidebar() {
   const pathname = usePathname();
   const router   = useRouter();
   const { user, logout } = useAuth();
-
-  const isActive = (href: string) =>
-    href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href);
 
   const handleLogout = () => { logout(); router.push('/'); };
 
@@ -33,9 +20,9 @@ export function Sidebar() {
         <Logo size="sm" />
       </div>
 
-      <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-        {NAV.map((item) => (
-          <Link key={item.href} href={item.href} className={cn('sidebar-link', isActive(item.href) && 'active')}>
+      <nav data-tour="desktop-nav" className="flex-1 px-4 space-y-1 overflow-y-auto">
+        {DASHBOARD_NAV.map((item) => (
+          <Link key={item.href} href={item.href} className={cn('sidebar-link', isNavActive(item.href, pathname) && 'active')}>
             <item.icon size={18} />
             <span>{item.label}</span>
           </Link>
