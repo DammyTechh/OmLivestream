@@ -1,19 +1,12 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Users, MessageSquare, Send, CreditCard, ShieldCheck, LogOut, Activity } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { useAdmin } from '@/store/auth';
 import { cn } from '@/lib/utils';
-
-const NAV = [
-  { href: '/admin/dashboard',    label: 'Overview',       icon: LayoutDashboard },
-  { href: '/admin/users',        label: 'Users',          icon: Users          },
-  { href: '/admin/contact',      label: 'Contact Inbox',  icon: MessageSquare  },
-  { href: '/admin/broadcasts',   label: 'Broadcasts',     icon: Send           },
-  { href: '/admin/payments',     label: 'Payments',       icon: CreditCard     },
-];
+import { ADMIN_NAV } from './admin-nav';
 
 export function AdminSidebar() {
   const pathname = usePathname();
@@ -39,7 +32,7 @@ export function AdminSidebar() {
       </div>
 
       <nav className="flex-1 px-4 space-y-1">
-        {NAV.map((item) => (
+        {ADMIN_NAV.map((item) => (
           <Link key={item.href} href={item.href} className={cn('sidebar-link', isActive(item.href) && 'active')}>
             <item.icon size={18} />
             <span>{item.label}</span>

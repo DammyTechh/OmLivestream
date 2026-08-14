@@ -457,7 +457,7 @@ export default function NewStreamPage() {
           </Card>
 
           {/* Source tabs */}
-          <div className={`grid gap-2 ${cam.profile.isDesktop ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <div className="grid grid-cols-3 gap-2">
             {[
               { mode: 'camera' as const, label: 'Camera',  Icon: Camera    },
               { mode: 'avatar' as const, label: 'Avatar',  Icon: UserIcon  },
@@ -469,7 +469,7 @@ export default function NewStreamPage() {
                   setSourceMode(m.mode);
                   if (m.mode !== 'camera' && cameraOn) stopCamera();
                 }}
-                className={`flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition ${
+                className={`flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition ${
                   sourceMode === m.mode ? 'bg-primary text-white' : 'bg-veil/5 text-muted hover:bg-veil/10'
                 }`}
               >
@@ -479,9 +479,13 @@ export default function NewStreamPage() {
           </div>
 
           {/* ── Camera setup ──────────────────────────────────────────
-              Which camera fills the frame, and whether a second one runs
-              alongside it. Only meaningful in camera mode. */}
-          {sourceMode === 'camera' && (
+              Desktop only. A computer can have several cameras with names
+              worth choosing between, and it's where two-at-once lives. A phone
+              has exactly two and the flip button sitting on the preview
+              already switches them, so this panel would only repeat a control
+              the creator can already see — and cost a chunk of a small screen
+              to do it. */}
+          {sourceMode === 'camera' && cam.profile.isDesktop && (
             <Card className="p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <SwitchCamera size={14} className="text-primary" />

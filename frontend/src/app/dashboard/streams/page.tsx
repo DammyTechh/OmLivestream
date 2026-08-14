@@ -33,17 +33,17 @@ export default function StreamsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">Your Streams</h1>
           <p className="text-muted mt-1">All your broadcasts, past and scheduled.</p>
         </div>
         <Link href="/dashboard/streams/new">
-          <Button icon={<Plus size={16} />}>New Stream</Button>
+          <Button icon={<Plus size={16} />} className="w-full sm:w-auto whitespace-nowrap">New Stream</Button>
         </Link>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {(['all', 'live', 'scheduled', 'ended'] as const).map((f) => (
           <button
             key={f}

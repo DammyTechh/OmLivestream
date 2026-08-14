@@ -63,9 +63,9 @@ export function AboutContent() {
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           <motion.div
             {...reveal}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/15 border border-primary/30 text-xs text-primary mb-6"
+            className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary mb-5"
           >
-            <Sparkles size={12} /> About OmliveStream
+            About OmliveStream
           </motion.div>
           <motion.h1
             {...reveal}

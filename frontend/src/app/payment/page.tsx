@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Check, CreditCard, ShieldCheck, ArrowLeft, Info, Tag } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { Navbar } from '@/components/landing/Navbar';
+import { Logo } from '@/components/ui/Logo';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { AuthGuard } from '@/components/auth/AuthGuard';
@@ -52,21 +52,38 @@ function PaymentContent() {
 
   return (
     <>
-      <Navbar />
-      <main className="min-h-screen pt-10 pb-20 relative">
-        <div className="relative mx-auto max-w-6xl px-6">
-          <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm text-muted hover:text-text mb-6">
-            <ArrowLeft size={14} /> Back to dashboard
+      {/* A checkout header, not the marketing navbar.
+      
+          This page used to mount the landing <Navbar />, so arriving from the
+          dashboard swapped the header for a different one with the controls on
+          the other side — jarring mid-payment. A pared-back bar (mark on the
+          left, one way back) is also simply what a checkout should have: no
+          menu to wander off into while a payment is half-finished. */}
+      <header className="sticky top-0 z-30 bg-bg/85 backdrop-blur-xl border-b border-border">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-3.5 flex items-center justify-between gap-4">
+          <Logo size="sm" href="/dashboard" />
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-text transition shrink-0"
+          >
+            <ArrowLeft size={14} />
+            <span className="hidden sm:inline">Back to dashboard</span>
+            <span className="sm:hidden">Back</span>
           </Link>
+        </div>
+      </header>
 
-          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-8">
+      <main className="min-h-screen pt-6 sm:pt-10 pb-20 relative">
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
+
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-6 lg:gap-8">
             {/* LEFT: Payment methods */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-              <Card className="p-8">
-                <div className="flex items-baseline justify-between mb-6">
-                  <h2 className="font-display text-2xl font-semibold">Total</h2>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="order-2 lg:order-1">
+              <Card className="p-5 sm:p-8">
+                <div className="flex items-baseline justify-between gap-3 mb-6">
+                  <h2 className="font-display text-xl sm:text-2xl font-semibold">Total</h2>
                   <div className="text-right">
-                    <div className="font-display text-3xl font-semibold tracking-tight">₦{total.toLocaleString()}</div>
+                    <div className="font-display text-2xl sm:text-3xl font-semibold tracking-tight">₦{total.toLocaleString()}</div>
                     <div className="text-sm text-muted">/{cycle}</div>
                   </div>
                 </div>
@@ -83,7 +100,7 @@ function PaymentContent() {
                 <button
                   onClick={() => paystackCheckout('google_pay')}
                   disabled={loading}
-                  className="w-full py-4 rounded-2xl bg-black text-white font-semibold mb-3 flex items-center justify-center gap-2 hover:bg-neutral-900 transition disabled:opacity-60 border border-veil/10"
+                  className="w-full py-3.5 sm:py-4 rounded-2xl bg-black text-white font-semibold text-sm sm:text-base mb-3 flex items-center justify-center gap-2 hover:bg-neutral-900 transition disabled:opacity-60 border border-veil/10"
                 >
                   {loadingMethod === 'google_pay'
                     ? 'Redirecting to Google Pay…'
@@ -98,7 +115,7 @@ function PaymentContent() {
                 <button
                   onClick={() => paystackCheckout('card')}
                   disabled={loading}
-                  className="w-full py-4 rounded-2xl bg-primary text-white font-semibold mb-5 flex items-center justify-center gap-2 hover:bg-primary/90 transition disabled:opacity-60 shadow-lg shadow-primary/25"
+                  className="w-full py-3.5 sm:py-4 rounded-2xl bg-primary text-white font-semibold text-sm sm:text-base mb-5 flex items-center justify-center gap-2 hover:bg-primary/90 transition disabled:opacity-60"
                 >
                   {loadingMethod === 'card'
                     ? 'Redirecting to secure checkout…'
@@ -120,19 +137,25 @@ function PaymentContent() {
                       className="input flex-1 font-mono text-sm"
                     />
                   </div>
-                  <p className="text-xs text-muted mt-2 flex items-start gap-1.5">
-                    <Info size={11} className="shrink-0 mt-0.5" />
-                    Waitlist rewards only. <strong className="text-text">OMLS1FREE-…</strong> gives 1 month free — redeem it from Billing, not here.{' '}
-                    <strong className="text-text">OMLS6DISC-…</strong> takes {WAITLIST_DISCOUNT_PCT}% off your first {WAITLIST_DISCOUNT_MONTHS} months and is applied to this payment.
-                  </p>
+                  {/* The icon and the copy are two flex items; the copy itself
+                      is ordinary flowing text. Putting `flex` on the paragraph
+                      made every text node and <strong> its own flex item, which
+                      laid the sentence out as narrow side-by-side columns. */}
+                  <div className="mt-2 flex items-start gap-1.5">
+                    <Info size={11} className="shrink-0 mt-[5px] text-muted" />
+                    <p className="text-xs text-muted leading-relaxed">
+                      Waitlist rewards only. <strong className="text-text">OMLS1FREE-…</strong> gives 1 month free — redeem it from Billing, not here.{' '}
+                      <strong className="text-text">OMLS6DISC-…</strong> takes {WAITLIST_DISCOUNT_PCT}% off your first {WAITLIST_DISCOUNT_MONTHS} months and is applied to this payment.
+                    </p>
+                  </div>
                 </div>
               </Card>
             </motion.div>
 
             {/* RIGHT: Plan summary */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-              <h1 className="font-display text-4xl font-semibold tracking-tight mb-3">Premium</h1>
-              <p className="text-muted mb-8 leading-relaxed">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="order-1 lg:order-2">
+              <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mb-3">Premium</h1>
+              <p className="text-muted mb-6 sm:mb-8 leading-relaxed">
                 Scale your influence with full engagement and pro-level customization.
               </p>
 

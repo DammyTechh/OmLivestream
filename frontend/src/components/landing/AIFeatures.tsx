@@ -45,9 +45,9 @@ export function AIFeatures() {
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/15 border border-primary/30 text-xs text-primary mb-6"
+            className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary mb-5"
           >
-            <Sparkles size={12} /> Powered by AI
+            Powered by AI
           </motion.div>
           <motion.h2
             initial={{ opacity: 0, y: 20 }}

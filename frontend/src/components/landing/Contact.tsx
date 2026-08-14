@@ -51,7 +51,7 @@ export function Contact() {
         {/* Contact Us card */}
         <div className="grid md:grid-cols-2 gap-10 rounded-[28px] bg-surface/60 border border-border p-8 md:p-12">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/15 border border-primary/30 text-[11px] text-primary mb-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary mb-5">
               <Mail size={11} /> Send us a message
             </div>
             <h3 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mb-4">Contact Us</h3>

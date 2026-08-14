@@ -319,23 +319,27 @@ function BillingContent() {
           had no way to put billing in place before it lapsed. This section is
           for exactly that case: it stays available once someone is premium. */}
       {isPremium && (
-        <Card className="p-6">
-          <div className="flex items-start gap-4 flex-wrap">
-            <div className="w-11 h-11 rounded-xl bg-veil/[0.06] border border-border flex items-center justify-center shrink-0">
-              <CreditCard size={19} className="text-muted" />
+        <Card className="p-5 sm:p-6">
+          {/* Icon beside the heading rather than beside the whole block: on a
+              phone a 44px tile in the leading column leaves the text about two
+              thirds of the width, so the paragraph turned into a narrow ribbon
+              and the button label broke across two lines. */}
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-9 h-9 rounded-xl bg-veil/[0.06] border border-border flex items-center justify-center shrink-0">
+              <CreditCard size={17} className="text-muted" />
             </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-display text-lg font-semibold mb-1">Payment method</h2>
-              <p className="text-sm text-muted mb-4 max-w-xl">
-                Add a card to keep Premium running without interruption. If your access came from a
-                free month or a reward code, adding a card now means it simply continues when that
-                period ends rather than lapsing.
-              </p>
-              <Link href="/payment?plan=premium">
-                <Button variant="secondary" icon={<CreditCard size={16} />}>Add a payment method</Button>
-              </Link>
-            </div>
+            <h2 className="font-display text-lg font-semibold">Payment method</h2>
           </div>
+          <p className="text-sm text-muted leading-relaxed mb-4 max-w-xl">
+            Add a card to keep Premium running without interruption. If your access came from a
+            free month or a reward code, adding a card now means it continues when that period
+            ends rather than lapsing.
+          </p>
+          <Link href="/payment?plan=premium" className="block sm:inline-block">
+            <Button variant="secondary" icon={<CreditCard size={16} />} className="w-full sm:w-auto whitespace-nowrap">
+              Add a payment method
+            </Button>
+          </Link>
         </Card>
       )}
 
