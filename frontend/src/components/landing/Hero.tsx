@@ -9,6 +9,7 @@ import { SocialButtons } from '@/components/auth/SocialButtons';
 import { StreamGraphic } from '@/components/ui/StreamGraphic';
 import { YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon, XIcon, LinkedInIcon, KickIcon } from '@/components/ui/BrandIcons';
 import { TOKEN_KEYS } from '@/lib/api';
+import { tokenStore } from '@/lib/token-store';
 
 const PLATFORMS = [
   { name: 'YouTube',   Icon: YouTubeIcon   },
@@ -28,7 +29,7 @@ export function Hero() {
   const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEYS.ACCESS) : null;
+    const token = typeof window !== 'undefined' ? tokenStore.get(TOKEN_KEYS.ACCESS) : null;
     setIsAuthed(!!token);
     if (token) {
       try {

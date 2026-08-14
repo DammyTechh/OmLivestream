@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { api, TOKEN_KEYS, unwrap } from '@/lib/api';
 import { resetSocket } from '@/lib/socket';
+import { tokenStore } from '@/lib/token-store';
 
 export type Plan = 'free_trial' | 'free' | 'premium';
 export type Role = 'super_admin' | 'admin' | 'support';
@@ -53,8 +54,8 @@ export const useAuth = create<AuthState>((set, get) => ({
   hydrated: false,
 
   setTokens: (accessToken, refreshToken) => {
-    localStorage.setItem(TOKEN_KEYS.ACCESS, accessToken);
-    localStorage.setItem(TOKEN_KEYS.REFRESH, refreshToken);
+    tokenStore.set(TOKEN_KEYS.ACCESS, accessToken);
+    tokenStore.set(TOKEN_KEYS.REFRESH, refreshToken);
     set({ accessToken, refreshToken });
   },
 
@@ -66,8 +67,8 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   hydrate: () => {
     if (typeof window === 'undefined') return;
-    const accessToken  = localStorage.getItem(TOKEN_KEYS.ACCESS);
-    const refreshToken = localStorage.getItem(TOKEN_KEYS.REFRESH);
+    const accessToken  = tokenStore.get(TOKEN_KEYS.ACCESS);
+    const refreshToken = tokenStore.get(TOKEN_KEYS.REFRESH);
     const userStr      = localStorage.getItem(TOKEN_KEYS.USER);
     set({
       accessToken,
@@ -88,8 +89,8 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
-    localStorage.removeItem(TOKEN_KEYS.ACCESS);
-    localStorage.removeItem(TOKEN_KEYS.REFRESH);
+    tokenStore.remove(TOKEN_KEYS.ACCESS);
+    tokenStore.remove(TOKEN_KEYS.REFRESH);
     localStorage.removeItem(TOKEN_KEYS.USER);
     // The socket authenticates once, at handshake, with the token that was in
     // localStorage then. Left open across a sign-out it keeps delivering the
@@ -117,8 +118,8 @@ export const useAdmin = create<AdminState>((set) => ({
   hydrated: false,
 
   setTokens: (accessToken, refreshToken) => {
-    localStorage.setItem(TOKEN_KEYS.ADMIN_ACCESS, accessToken);
-    localStorage.setItem(TOKEN_KEYS.ADMIN_REFRESH, refreshToken);
+    tokenStore.set(TOKEN_KEYS.ADMIN_ACCESS, accessToken);
+    tokenStore.set(TOKEN_KEYS.ADMIN_REFRESH, refreshToken);
     set({ accessToken, refreshToken });
   },
 
@@ -130,8 +131,8 @@ export const useAdmin = create<AdminState>((set) => ({
 
   hydrate: () => {
     if (typeof window === 'undefined') return;
-    const accessToken  = localStorage.getItem(TOKEN_KEYS.ADMIN_ACCESS);
-    const refreshToken = localStorage.getItem(TOKEN_KEYS.ADMIN_REFRESH);
+    const accessToken  = tokenStore.get(TOKEN_KEYS.ADMIN_ACCESS);
+    const refreshToken = tokenStore.get(TOKEN_KEYS.ADMIN_REFRESH);
     const adminStr     = localStorage.getItem(TOKEN_KEYS.ADMIN_USER);
     set({
       accessToken,
@@ -142,8 +143,8 @@ export const useAdmin = create<AdminState>((set) => ({
   },
 
   logout: () => {
-    localStorage.removeItem(TOKEN_KEYS.ADMIN_ACCESS);
-    localStorage.removeItem(TOKEN_KEYS.ADMIN_REFRESH);
+    tokenStore.remove(TOKEN_KEYS.ADMIN_ACCESS);
+    tokenStore.remove(TOKEN_KEYS.ADMIN_REFRESH);
     localStorage.removeItem(TOKEN_KEYS.ADMIN_USER);
     set({ accessToken: null, refreshToken: null, admin: null });
   },

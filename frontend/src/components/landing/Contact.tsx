@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { TOKEN_KEYS } from '@/lib/api';
+import { tokenStore } from '@/lib/token-store';
 import { api, getApiError } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { FacebookIcon, InstagramIcon, TikTokIcon } from '@/components/ui/BrandIcons';
@@ -123,7 +124,7 @@ export function Contact() {
 function CtaButton() {
   const [authed, setAuthed] = useState<boolean>(false);
   useEffect(() => {
-    setAuthed(!!(typeof window !== 'undefined' && localStorage.getItem(TOKEN_KEYS.ACCESS)));
+    setAuthed(!!(typeof window !== 'undefined' && tokenStore.get(TOKEN_KEYS.ACCESS)));
   }, []);
   return (
     <Link

@@ -1,3 +1,4 @@
+import { tokenStore } from './token-store';
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
@@ -35,7 +36,7 @@ const shouldSkipRefresh = (url?: string) =>
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (typeof window === 'undefined') return config;
   const isAdmin = config.url?.startsWith('/admin') ?? false;
-  const token = localStorage.getItem(isAdmin ? TOKEN_KEYS.ADMIN_ACCESS : TOKEN_KEYS.ACCESS);
+  const token = tokenStore.get(isAdmin ? TOKEN_KEYS.ADMIN_ACCESS : TOKEN_KEYS.ACCESS);
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });

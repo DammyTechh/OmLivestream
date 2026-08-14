@@ -33,7 +33,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-gradient-to-br from-[#1A0E3A] via-[#2D0F5F] to-[#7C3AED]">
           <WavyBackground />
           <div className="relative z-10 flex flex-col justify-between p-12 w-full">
-            <Logo size="md" />
+            <Logo size="md" tone="onDark" />
 
             <div className="flex-1 flex items-center justify-center py-8">
               <motion.div

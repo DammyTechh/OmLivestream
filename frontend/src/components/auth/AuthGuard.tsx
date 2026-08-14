@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/store/auth';
 import { TOKEN_KEYS } from '@/lib/api';
+import { tokenStore } from '@/lib/token-store';
 import { Spinner } from '@/components/ui/Spinner';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEYS.ACCESS) : null;
+    const token = typeof window !== 'undefined' ? tokenStore.get(TOKEN_KEYS.ACCESS) : null;
     if (!token) {
       router.replace('/auth/signin');
       return;

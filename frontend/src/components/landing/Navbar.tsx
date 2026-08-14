@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { Menu, X, LayoutDashboard, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TOKEN_KEYS } from '@/lib/api';
+import { tokenStore } from '@/lib/token-store';
 import { resetSocket } from '@/lib/socket';
 
 export function Navbar() {
@@ -21,7 +22,7 @@ export function Navbar() {
 
   useEffect(() => {
     // Check auth state on every pathname change (for when user navigates back to /)
-    const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEYS.ACCESS) : null;
+    const token = typeof window !== 'undefined' ? tokenStore.get(TOKEN_KEYS.ACCESS) : null;
     setIsAuthed(!!token);
     if (token) {
       try {
@@ -48,8 +49,8 @@ export function Navbar() {
   };
 
   const logout = () => {
-    localStorage.removeItem(TOKEN_KEYS.ACCESS);
-    localStorage.removeItem(TOKEN_KEYS.REFRESH);
+    tokenStore.remove(TOKEN_KEYS.ACCESS);
+    tokenStore.remove(TOKEN_KEYS.REFRESH);
     localStorage.removeItem(TOKEN_KEYS.USER);
     resetSocket();
     setIsAuthed(false);

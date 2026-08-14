@@ -1,6 +1,7 @@
 'use client';
 import { io, Socket } from 'socket.io-client';
 import { TOKEN_KEYS } from './api';
+import { tokenStore } from './token-store';
 
 /**
  * One socket for the whole dashboard.
@@ -23,7 +24,7 @@ let refs = 0;
 export function acquireSocket(): Socket | null {
   if (typeof window === 'undefined') return null;
 
-  const token = localStorage.getItem(TOKEN_KEYS.ACCESS);
+  const token = tokenStore.get(TOKEN_KEYS.ACCESS);
   // The server's auth middleware rejects a tokenless handshake, so connecting
   // without one just produces a connect_error loop with backoff.
   if (!token) return null;

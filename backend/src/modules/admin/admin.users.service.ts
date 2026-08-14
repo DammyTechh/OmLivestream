@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { supabaseAdmin } from '../../config/supabase';
+import { logger } from '../../config/logger';
 import { NotFoundError, AppError } from '../../utils/errors';
 import { EmailService } from '../email/email.service';
 import type { UserStatus } from '../../types/database';
@@ -35,6 +36,32 @@ export class AdminUsersService {
 
     const { data, error, count } = await query;
     if (error) throw error;
+
+    /**
+     * Diagnostic for the "Overview says N users, Users page says none" case.
+     *
+     * The two screens reach the data by different routes: Overview calls the
+     * admin_dashboard_stats RPC, which is SECURITY DEFINER and therefore runs
+     * with the function owner's rights, while this is a plain table read whose
+     * rights are whatever key the client was built with. So the one way to see
+     * a healthy count on one screen and an empty list on the other is for this
+     * connection to be subject to row-level security — i.e. for
+     * SUPABASE_SERVICE_ROLE_KEY to not actually be the service-role key in this
+     * environment. RLS filters rows silently; it is not an error, which is why
+     * this surfaced as a blank page rather than a failure.
+     *
+     * Logging both numbers makes that unambiguous instead of a guess: a zero
+     * count here alongside a non-zero count on the dashboard is the signature.
+     */
+    if ((data?.length ?? 0) === 0 && opts.page === 1 && !opts.search && !opts.plan && !opts.status) {
+      logger.warn(
+        { returned: data?.length ?? 0, count },
+        'admin listUsers returned no rows on an unfiltered first page. ' +
+        'If the admin dashboard reports a non-zero user total, this connection is being ' +
+        'filtered by RLS — verify SUPABASE_SERVICE_ROLE_KEY is the service-role key, not the anon key.',
+      );
+    }
+
     return { data: data ?? [], total: count ?? 0 };
   }
 

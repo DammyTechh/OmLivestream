@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { WavyBackground } from '@/components/ui/WavyBackground';
 import { Spinner } from '@/components/ui/Spinner';
 import { api, getApiError, TOKEN_KEYS } from '@/lib/api';
+import { tokenStore } from '@/lib/token-store';
 import { useAuth } from '@/store/auth';
 import { EmailClaimGate } from '@/components/auth/EmailClaimGate';
 
@@ -48,7 +49,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     hydrate();
-    const token = typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEYS.ACCESS) : null;
+    const token = typeof window !== 'undefined' ? tokenStore.get(TOKEN_KEYS.ACCESS) : null;
     if (!token) {
       router.replace('/auth/signup');
       return;
