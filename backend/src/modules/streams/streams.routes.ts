@@ -154,6 +154,38 @@ export async function streamsRoutes(fastify: FastifyInstance): Promise<void> {
     sendSuccess(reply, null, 'Stream ended — recording is being processed');
   });
 
+  /**
+   * Post-broadcast feedback.
+   *
+   * Written with the service-role client through the service layer, keyed by
+   * (user, stream) so a resubmit after a dropped connection updates rather
+   * than duplicating. Deliberately tolerant: feedback is a nice-to-have, and a
+   * failure here must never be surfaced as if the broadcast itself went wrong.
+   */
+  fastify.post('/:id/feedback', {
+    schema: {
+      tags: ['Streams'],
+      summary: 'Submit feedback about a finished or cancelled broadcast',
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['rating'],
+        properties: {
+          rating:       { type: 'integer', minimum: 1, maximum: 5 },
+          issues:       { type: 'array', maxItems: 12, items: { type: 'string', maxLength: 40 } },
+          comment:      { type: 'string', maxLength: 2000 },
+          endedReason:  { type: 'string', enum: ['ended', 'cancelled'] },
+        },
+      },
+    },
+  }, async (req: FastifyRequest<{
+    Params: { id: string };
+    Body: { rating: number; issues?: string[]; comment?: string; endedReason?: 'ended' | 'cancelled' };
+  }>, reply) => {
+    await svc.submitFeedback(getAuthUser(req).id, req.params.id, req.body);
+    sendSuccess(reply, null, 'Thanks — your feedback was recorded');
+  });
+
   // Network analysis
   fastify.post('/network-check', {
     schema: {

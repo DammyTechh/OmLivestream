@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLiveStreamGuard } from '@/hooks/useLiveStreamGuard';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Radio, Square, Users, MessageSquare, Send } from 'lucide-react';
+import { ArrowLeft, Radio, Square, Users, MessageSquare, Send, Maximize2, Minimize2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Socket } from 'socket.io-client';
 import { acquireSocket, releaseSocket } from '@/lib/socket';
@@ -14,6 +14,7 @@ import { api, unwrap, getApiError } from '@/lib/api';
 import { formatNumber } from '@/lib/utils';
 import { useAuth } from '@/store/auth';
 import { entitlements, UPGRADE_COPY } from '@/lib/entitlements';
+import { StreamFeedbackModal } from '@/components/dashboard/StreamFeedbackModal';
 import {
   YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon,
   XIcon, LinkedInIcon, KickIcon,
@@ -78,6 +79,12 @@ export default function StreamDetailPage() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const { user } = useAuth();
   const ent = entitlements(user?.plan);
+  // Focus mode: the live panel expanded to fill the screen. Useful on a second
+  // monitor while presenting, where the browser chrome and the dashboard around
+  // it are noise.
+  const liveRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [feedbackFor, setFeedbackFor] = useState<'ended' | 'cancelled' | null>(null);
   const [replyFor, setReplyFor] = useState<Comment | null>(null);
   const [replyText, setReplyText] = useState('');
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
@@ -154,13 +161,31 @@ export default function StreamDetailPage() {
     } finally { setActioning(false); }
   }
 
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (liveRef.current) await liveRef.current.requestFullscreen();
+    } catch {
+      toast.error('Your browser blocked fullscreen for this page.');
+    }
+  };
+
   async function endStream() {
     if (!confirm('End this stream? The recording will start processing.')) return;
     setActioning(true);
     try {
       await api.post(`/streams/${id}/end`);
       toast.success('Stream ended — recording is processing');
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
       await fetchStream();
+      // Asked now, while it is still fresh — see StreamFeedbackModal.
+      setFeedbackFor('ended');
     } catch (err) {
       toast.error(getApiError(err, 'Could not end stream'));
     } finally { setActioning(false); }
@@ -222,9 +247,24 @@ export default function StreamDetailPage() {
 
       {/* Per-platform live audience and comments */}
       {stream.status === 'live' && (
-        <div>
-          <h2 className="font-display text-xl font-semibold mb-3">Live stats by platform</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div
+          ref={liveRef}
+          className={fullscreen ? 'bg-bg p-6 sm:p-10 overflow-y-auto h-full' : undefined}
+        >
+          <div className="flex items-center justify-between gap-4 mb-3">
+            <h2 className={`font-display font-semibold ${fullscreen ? 'text-3xl' : 'text-xl'}`}>
+              Live stats by platform
+            </h2>
+            <button
+              onClick={toggleFullscreen}
+              title={fullscreen ? 'Exit fullscreen' : 'Expand to fullscreen'}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-veil/5 hover:bg-veil/10 border border-border text-xs font-medium transition shrink-0"
+            >
+              {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              <span className="hidden sm:inline">{fullscreen ? 'Exit' : 'Expand'}</span>
+            </button>
+          </div>
+          <div className={`grid gap-3 ${fullscreen ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 md:grid-cols-4'}`}>
             {(stream.stream_platforms ?? []).map((p) => {
               const Icon = PLATFORM_ICONS[p.platform];
               const m = platformMetrics[p.platform];
@@ -237,11 +277,11 @@ export default function StreamDetailPage() {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted flex items-center gap-1.5"><Users size={12} /> Viewers</span>
-                      <span className="font-semibold">{formatNumber(m?.viewers ?? 0)}</span>
+                      <span className={`font-semibold ${fullscreen ? 'text-2xl' : ''}`}>{formatNumber(m?.viewers ?? 0)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted flex items-center gap-1.5"><MessageSquare size={12} /> Comments</span>
-                      <span className="font-semibold">{formatNumber(m?.comments ?? 0)}</span>
+                      <span className={`font-semibold ${fullscreen ? 'text-2xl' : ''}`}>{formatNumber(m?.comments ?? 0)}</span>
                     </div>
                   </div>
                 </Card>
@@ -342,6 +382,12 @@ export default function StreamDetailPage() {
           </Card>
         </div>
       )}
+    <StreamFeedbackModal
+        streamId={id as string}
+        reason={feedbackFor ?? 'ended'}
+        open={feedbackFor !== null}
+        onClose={() => setFeedbackFor(null)}
+      />
     </div>
   );
 }

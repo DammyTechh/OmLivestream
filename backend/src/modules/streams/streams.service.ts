@@ -349,6 +349,40 @@ export class StreamsService {
     }
   }
 
+  /**
+   * Record how a broadcast went, from the creator's point of view.
+   *
+   * Upserted on (user_id, stream_id) so the modal can be retried after a
+   * dropped request without creating a second row, and so someone who reopens
+   * it can revise what they said.
+   *
+   * The stream is verified to belong to the caller before writing — otherwise
+   * feedback could be attached to somebody else's broadcast by guessing an id.
+   */
+  async submitFeedback(
+    userId: string,
+    streamId: string,
+    input: { rating: number; issues?: string[]; comment?: string; endedReason?: 'ended' | 'cancelled' },
+  ): Promise<void> {
+    const { data: stream } = await supabaseAdmin
+      .from('streams').select('id').eq('id', streamId).eq('user_id', userId).single();
+    if (!stream) throw new NotFoundError('Stream');
+
+    const { error } = await supabaseAdmin
+      .from('stream_feedback')
+      .upsert({
+        user_id:      userId,
+        stream_id:    streamId,
+        rating:       input.rating,
+        issues:       input.issues ?? [],
+        comment:      input.comment?.trim() || null,
+        ended_reason: input.endedReason ?? 'ended',
+        updated_at:   new Date().toISOString(),
+      }, { onConflict: 'user_id,stream_id' });
+
+    if (error) throw error;
+  }
+
   async end(userId: string, streamId: string): Promise<void> {
     const { data: stream } = await supabaseAdmin
       .from('streams').select('status').eq('id', streamId).eq('user_id', userId).single();

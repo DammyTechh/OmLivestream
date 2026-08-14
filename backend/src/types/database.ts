@@ -38,6 +38,31 @@ export interface Database {
     Tables: {
 
       // ── users ──────────────────────────────────────────────────
+      stream_feedback: {
+        Row: {
+          id:           string;
+          user_id:      string;
+          stream_id:    string | null;
+          rating:       number;
+          issues:       string[];
+          comment:      string | null;
+          ended_reason: string;
+          created_at:   string;
+          updated_at:   string;
+        };
+        Insert: {
+          id?:           string;
+          user_id:       string;
+          stream_id?:    string | null;
+          rating:        number;
+          issues?:       string[];
+          comment?:      string | null;
+          ended_reason?: string;
+          created_at?:   string;
+          updated_at?:   string;
+        };
+        Update: Partial<Database['public']['Tables']['stream_feedback']['Insert']>;
+      };
       users: {
         Row: {
           id:                      string;

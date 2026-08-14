@@ -18,6 +18,9 @@ const muted   = '#6B6880';
 const brand   = '#6D28D9';
 const line    = 'rgba(255,255,255,0.08)';
 
+/** Absolute — an email has no origin to resolve a relative path against. */
+const logoMark = `${urls.site.replace(/\/+$/, '')}/logo-mark.png`;
+
 // ── Template helpers ──────────────────────────────────────────────
 const wrap = (body: string) => `<!DOCTYPE html><html><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -25,23 +28,31 @@ const wrap = (body: string) => `<!DOCTYPE html><html><head>
 <body style="margin:0;padding:0;background:${bg};font-family:'DM Sans',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};padding:40px 16px;">
 <tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0" style="background:${surface};border-radius:16px;border:1px solid rgba(124,58,237,0.2);overflow:hidden;max-width:560px;width:100%;">
-<tr><td style="background:${brand};padding:26px 40px;text-align:center;">
-  <!-- The wordmark is set as text, not an image.
+<table width="560" cellpadding="0" cellspacing="0" style="background:${surface};border-radius:16px;border:1px solid ${line};overflow:hidden;max-width:560px;width:100%;">
 
-       It used to be an <img> pointing at the marketing site's logo.png. Two
-       problems: most clients (Gmail included, for unknown senders) block
-       remote images by default, so the brand simply vanished from the top of
-       every transactional email; and that particular asset sets "Omlive" in a
-       pale lavender tuned for a dark page, which washed out to nearly nothing
-       on a light background. Text always renders, costs no request, and can
-       be given proper contrast. Also a flat brand fill rather than a
-       gradient sweep — several clients drop CSS gradients and fall back to
-       transparent, which left white text on white. -->
-  <span style="font-size:21px;font-weight:700;letter-spacing:-0.02em;color:#FFFFFF;">Omlive<span style="color:#DDD0FB;">Stream</span></span>
+<!-- A hairline of brand colour instead of a solid block of it.
+
+     The header used to be a 26px-tall slab of #6D28D9 across the full width,
+     which is a lot of saturated purple to open an email into and made every
+     message read as an advert before it read as a receipt or a login code. A
+     4px rule carries the brand just as clearly and lets the content lead. -->
+<tr><td style="background:${brand};height:4px;line-height:4px;font-size:0;">&nbsp;</td></tr>
+
+<tr><td style="padding:24px 40px 20px;text-align:center;border-bottom:1px solid ${line};">
+  <!-- Mark + wordmark. The mark is a PNG, not the WebP the site uses: Outlook
+       and several older clients cannot decode WebP and would show a broken
+       image box. It is served absolutely from the marketing site because an
+       email has no origin to resolve a relative path against.
+
+       The wordmark stays as text beside it rather than being baked into the
+       image, so the brand is still legible in the many clients that block
+       remote images by default. -->
+  <img src="${logoMark}" width="26" height="26" alt=""
+       style="display:inline-block;vertical-align:middle;border:0;outline:none;margin-right:8px;">
+  <span style="font-size:19px;font-weight:700;letter-spacing:-0.02em;color:${text};vertical-align:middle;">Omlive<span style="color:#A855F7;">Stream</span></span>
 </td></tr>
 ${body}
-<tr><td style="padding:20px 40px;border-top:1px solid rgba(124,58,237,0.15);text-align:center;">
+<tr><td style="padding:20px 40px;border-top:1px solid ${line};text-align:center;">
   <p style="color:${muted};font-size:12px;margin:0 0 8px;">
     Need help? <a href="mailto:${env.SUPPORT_EMAIL}" style="color:#A855F7;text-decoration:none;">${env.SUPPORT_EMAIL}</a>
     &nbsp;•&nbsp; Sales: <a href="mailto:${env.SALES_EMAIL}" style="color:#A855F7;text-decoration:none;">${env.SALES_EMAIL}</a>
@@ -89,15 +100,38 @@ export class EmailService {
 
   // ── 2. Welcome ─────────────────────────────────────────────────
   async sendWelcomeEmail(to: string): Promise<void> {
+    /**
+     * The steps were an <ol> whose items each ran "Title — description" on one
+     * wrapped line at line-height 2. At email width that broke mid-phrase and
+     * the em dashes read as stray punctuation once a line turned over, which
+     * is what made it look scattered. Each step is now its own row: a numbered
+     * marker, the action in the product's own words, and the detail on the
+     * line beneath it. No dashes doing structural work.
+     */
+    const step = (n: number, title: string, detail: string) => `
+      <tr>
+        <td width="30" valign="top" style="padding:0 0 16px;">
+          <div style="width:22px;height:22px;border-radius:11px;background:rgba(168,85,247,0.15);color:#A855F7;font-size:12px;font-weight:700;text-align:center;line-height:22px;">${n}</div>
+        </td>
+        <td valign="top" style="padding:0 0 16px;">
+          <div style="color:${text};font-size:15px;font-weight:600;line-height:1.4;">${title}</div>
+          <div style="color:${muted};font-size:13px;line-height:1.6;margin-top:2px;">${detail}</div>
+        </td>
+      </tr>`;
+
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Your account is ready</h2>
-      <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 20px;">Welcome to OmliveStream — the only platform you need to go live everywhere at once.</p>
-      <ol style="color:${muted};font-size:14px;line-height:2;margin:0 0 28px;padding-left:18px;">
-        <li><strong style="color:${text};">Connect your platforms</strong> — YouTube, TikTok, Twitch & more</li>
-        <li><strong style="color:${text};">Create a stream</strong> — title, thumbnail, select platforms</li>
-        <li><strong style="color:${text};">Go live</strong> — reach your entire audience simultaneously</li>
-      </ol>
-      ${btn(`${urls.dashboard}/dashboard`, 'Go to Dashboard →')}
+      <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 10px;">Your account is ready</h2>
+      <p style="color:${muted};font-size:15px;line-height:1.65;margin:0 0 26px;">
+        Welcome to OmliveStream. Go live once and reach every platform at the same time.
+      </p>
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+        ${step(1, 'Connect your platforms', 'YouTube, TikTok, Twitch, Instagram and more.')}
+        ${step(2, 'Create a stream', 'Add a title and thumbnail, then choose where it goes.')}
+        ${step(3, 'Go live', 'One broadcast, your whole audience, all at once.')}
+      </table>
+
+      <div style="text-align:center;">${btn(`${urls.dashboard}/dashboard`, 'Go to dashboard')}</div>
     </td></tr>`);
     await this.send(to, 'Welcome to OmliveStream — your account is ready', html);
   }
@@ -179,7 +213,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Subscription Cancelled</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 12px;">Your subscription has been cancelled. Premium access continues until <strong style="color:${text};">${endDate}</strong>.</p>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 28px;">You can resubscribe any time from your billing settings.</p>
-      ${btn(`${urls.payment}/billing`, 'Resubscribe →')}
+      ${btn(`${urls.payment}/billing`, 'Resubscribe')}
     </td></tr>`);
     await this.send(to, 'OmliveStream — Subscription cancelled', html);
   }
@@ -190,7 +224,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Your recording is ready</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 8px;">Your stream <strong style="color:${text};">"${streamTitle}"</strong> has been saved successfully.</p>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 28px;">Download, AI-edit, or publish directly to your platforms.</p>
-      ${btn(`${urls.dashboard}/recordings`, 'View Recording →')}
+      ${btn(`${urls.dashboard}/recordings`, 'View recording')}
     </td></tr>`);
     await this.send(to, `Recording ready: "${streamTitle}"`, html);
   }
@@ -211,7 +245,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Your audience is waiting, ${name || 'Creator'}</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 12px;">You haven't streamed in 5 days. Your followers across all your connected platforms are waiting.</p>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 28px;">Consistency is what builds an audience. Even a short stream keeps the momentum going.</p>
-      ${btn(`${urls.dashboard}/dashboard`, 'Go Live Now →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Go live')}
     </td></tr>`);
     await this.send(to, `${name || 'Creator'}, your audience is waiting`, html);
   }
@@ -231,7 +265,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Subscription renewed</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 8px;">Your <strong style="color:${text};">${plan}</strong> plan has been renewed successfully.</p>
       <p style="color:${muted};font-size:14px;margin:0 0 28px;">Next billing date: <strong style="color:${text};">${new Date(nextBillingDate).toLocaleDateString('en-NG', { dateStyle: 'long' })}</strong></p>
-      ${btn(`${urls.payment}/billing`, 'View Billing →')}
+      ${btn(`${urls.payment}/billing`, 'View billing')}
     </td></tr>`);
     await this.send(to, 'OmliveStream — Subscription renewed', html);
   }
@@ -242,7 +276,7 @@ export class EmailService {
       <span style="display:inline-block;background:rgba(124,58,237,0.15);color:#A855F7;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:4px 12px;border-radius:99px;margin-bottom:16px;">New Feature</span>
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">${title}</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 28px;">${description}</p>
-      ${btn(`${urls.dashboard}/dashboard`, 'Try It Now →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Try it now')}
     </td></tr>`);
     await this.send(to, `New on OmliveStream: ${title}`, html);
   }
@@ -261,7 +295,7 @@ export class EmailService {
         ${row('Device', d.userAgent.slice(0, 60) + (d.userAgent.length > 60 ? '…' : ''))}
       </table>
       <p style="color:${muted};font-size:14px;line-height:1.6;margin:0 0 24px;">If this was you, no action needed. If not, secure your account immediately.</p>
-      ${btn(`${urls.dashboard}/settings/security`, 'Secure My Account →')}
+      ${btn(`${urls.dashboard}/settings/security`, 'Secure my account')}
     </td></tr>`);
     await this.send(to, 'New device sign-in to your OmliveStream account', html);
   }
@@ -278,7 +312,7 @@ export class EmailService {
         ${row('Access Until', endDate)}
       </table>
       <p style="color:${muted};font-size:14px;margin:0 0 28px;">Full access — comment replies, AI editing, 8 platforms, analytics.</p>
-      ${btn(`${urls.dashboard}/dashboard`, 'Start Streaming →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Start streaming')}
     </td></tr>`);
     await this.send(to, 'Your OmliveStream Premium plan is active', html);
   }
@@ -323,7 +357,7 @@ export class EmailService {
         <p style="font-family:'Courier New',monospace;font-size:22px;font-weight:700;color:${text};letter-spacing:3px;margin:0 0 8px;">${d.sixMonthCode}</p>
         <p style="color:${muted};font-size:13px;margin:0;">${WAITLIST_DISCOUNT_PCT}% off each of your first ${WAITLIST_DISCOUNT_MONTHS} months — enter it at checkout</p>
       </div>
-      ${btn(`${urls.dashboard}/dashboard`, 'Start Streaming →')}
+      ${btn(`${urls.dashboard}/dashboard`, 'Start streaming')}
       <p style="color:${muted};font-size:12px;margin:16px 0 0;">Codes expire in 90 days. Redeem your free month from Billing; enter the discount code at checkout.</p>
     </td></tr>`);
     await this.send(to, 'Your OmliveStream waitlist rewards — codes inside', html);
@@ -340,7 +374,7 @@ export class EmailService {
         ${row('Premium', 'All 8 platforms, comment replies, unlimited')}
       </table>
       <p style="color:${muted};font-size:14px;margin:0 0 24px;">Upgrade now to keep streaming to multiple platforms without interruption.</p>
-      ${btn(`${urls.payment}/billing`, 'Upgrade to Premium →')}
+      ${btn(`${urls.payment}/billing`, 'Upgrade to Premium')}
     </td></tr>`);
     await this.send(to, `Your OmliveStream trial ends in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`, html);
   }
@@ -351,7 +385,7 @@ export class EmailService {
       <h2 style="color:${text};font-size:22px;font-weight:700;margin:0 0 12px;">Your free trial has ended</h2>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 20px;">Hey ${name || 'Creator'}, your 90-day trial is over. You're now on the Free plan — you can still stream to 1 platform.</p>
       <p style="color:${muted};font-size:15px;line-height:1.6;margin:0 0 28px;">Upgrade to Premium to stream on all 8 platforms, reply to comments, and get unlimited streams.</p>
-      ${btn(`${urls.payment}/billing`, 'Upgrade to Premium →')}
+      ${btn(`${urls.payment}/billing`, 'Upgrade to Premium')}
     </td></tr>`);
     await this.send(to, 'Your OmliveStream trial has ended — upgrade to keep full access', html);
   }
