@@ -15,6 +15,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { AuthLayout } from '@/components/auth/AuthLayout';
+import { dashboardUrl } from '@/lib/surface-links';
 import { api, getApiError, unwrap } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 import toast from 'react-hot-toast';
@@ -77,7 +78,11 @@ function CallbackInner() {
         }
 
         toast.success(data.isNewUser ? 'Welcome to OmliveStream!' : 'Welcome back');
-        router.replace(data.isNewUser ? '/onboarding' : '/dashboard');
+        // Cross-host: the dashboard lives on its own subdomain, so a router push
+        // would only change the path on the auth host. Onboarding is shared and
+        // stays a normal client navigation.
+        if (data.isNewUser) router.replace('/onboarding');
+        else window.location.assign(dashboardUrl());
       } catch (err) {
         setStatus('failed');
         setMessage(getApiError(err, `We couldn't complete your ${label} sign-in. Please try again.`));

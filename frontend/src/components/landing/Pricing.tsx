@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { PREMIUM_PRICE, naira } from '@/lib/pricing';
+import { paymentUrl } from '@/lib/surface-links';
 
 const FREE_FEATURES = [
   'Access to a maximum of 2 streaming platforms',
@@ -102,7 +103,7 @@ export function Pricing() {
             </div>
 
             <Link
-              href="/payment?plan=premium"
+              href={paymentUrl("?plan=premium")}
               className="block w-full py-3.5 text-center rounded-2xl bg-primary text-white font-semibold hover:bg-primary/90 transition shadow-lg shadow-primary/25"
             >
               Choose this plan

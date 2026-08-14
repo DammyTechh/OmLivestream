@@ -12,9 +12,28 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
+/**
+ * Gate a route on a live Premium subscription.
+ *
+ * Resolved from the database, not from the token's `plan` claim. An access
+ * token is a snapshot: one minted before an upgrade still says 'free', and —
+ * the part that matters — one minted before a downgrade or a lapsed trial
+ * still says 'premium' until it expires. Trusting the claim meant a cancelled
+ * subscriber kept paid features for the life of their token.
+ * getEffectivePlan also settles an expired trial as it reads, so it cannot be
+ * outrun by holding on to an old token.
+ */
 export async function requirePremium(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const user = getAuthUser(request);
-  if (user.plan !== 'premium') {
+  try {
+    const { PlansService } = await import('../modules/plans/plans.service');
+    const { plan } = await new PlansService().getEffectivePlan(user.id);
+    if (plan !== 'premium') {
+      sendError(reply, 'PREMIUM_REQUIRED', 'This feature requires a Premium subscription', 403);
+    }
+  } catch {
+    // Fail closed: if the plan cannot be established, do not hand out a paid
+    // feature on the strength of an unverified claim.
     sendError(reply, 'PREMIUM_REQUIRED', 'This feature requires a Premium subscription', 403);
   }
 }

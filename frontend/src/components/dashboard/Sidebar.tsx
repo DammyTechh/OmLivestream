@@ -1,8 +1,9 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LogOut, Sparkles } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
+import { paymentUrl } from '@/lib/surface-links';
 import { useAuth } from '@/store/auth';
 import { cn } from '@/lib/utils';
 import { DASHBOARD_NAV, isNavActive } from './nav-items';
@@ -30,13 +31,10 @@ export function Sidebar() {
       </nav>
 
       {user?.plan !== 'premium' && (
-        <div className="mx-4 mb-4 p-4 rounded-2xl bg-gradient-to-br from-primary/15 to-accent/10 border border-primary/30">
-          <div className="flex items-center gap-2 mb-1.5">
-            <Sparkles size={14} className="text-primary" />
-            <span className="text-xs font-semibold">Upgrade to Premium</span>
-          </div>
+        <div className="mx-4 mb-4 p-4 rounded-2xl bg-veil/[0.04] border border-border">
+          <div className="text-xs font-semibold mb-1.5">Upgrade to Premium</div>
           <p className="text-xs text-muted mb-3">Stream to all 8 platforms. Reply to comments. AI video editing.</p>
-          <Link href="/payment?plan=premium" className="block w-full text-center py-2 rounded-xl bg-veil/10 text-xs font-semibold hover:bg-veil/15 transition">
+          <Link href={paymentUrl("?plan=premium")} className="block w-full text-center py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition">
             Upgrade
           </Link>
         </div>

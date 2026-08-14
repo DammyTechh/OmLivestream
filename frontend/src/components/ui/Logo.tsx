@@ -2,24 +2,24 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 /**
- * The lockup: an inline SVG mark plus live text. No image file, deliberately.
+ * The brand lockup: the orb mark plus the OmliveStream wordmark.
  *
- * Two separate problems led here.
+ * The mark is the original artwork, served from public/logo-mark.webp (the orb
+ * cropped out of the full logo so it can sit next to live text). It is a plain
+ * <img> rather than next/image: it is 3.7KB, it never needs resizing, and
+ * going direct avoids depending on the image optimizer resolving correctly
+ * behind the subdomain rewrites.
  *
- * 1. The mark used to be /logo-mark.webp. A root-relative asset only resolves
- *    on a host that actually serves it, so on dashboard./payment./admin.
- *    omlivestream.com — which route to the app but do not necessarily serve its
- *    static files at the root — it rendered as a broken-image box. Drawing the
- *    mark inline removes the network request altogether, so it cannot 404, is
- *    immune to CDN and subdomain routing, stays sharp at any size, and costs no
- *    extra round trip.
+ * It renders on every host now that the middleware stops rewriting static file
+ * paths — `/logo-mark.webp` on dashboard.omlivestream.com was being turned into
+ * `/dashboard/logo-mark.webp`, which is why the mark showed as a broken image
+ * across the subdomains.
  *
- * 2. The wordmark is `text-text`, which is near-black under the light theme.
- *    That is right on a light page and invisible on a dark one — and the
- *    sign-in illustration panel keeps its violet gradient in *both* themes, so
- *    under light mode "Omlive" disappeared into it while "Stream" (brand
- *    violet) survived. `tone="onDark"` pins the lockup to light ink for those
- *    fixed-dark surfaces instead of letting it follow the theme.
+ * The wordmark stays live text so it can follow the theme. The original raster
+ * set "Omlive" in a pale lavender tuned for a dark page, which disappeared on
+ * the light theme; as text it takes the theme's ink colour and is legible in
+ * both. `tone="onDark"` pins it to white for surfaces that stay dark whatever
+ * the theme — the sign-in illustration panel, the email header.
  */
 export function Logo({
   className,
@@ -30,32 +30,29 @@ export function Logo({
   className?: string;
   size?: 'sm' | 'md' | 'lg';
   href?: string | null;
-  /** 'onDark' for surfaces that stay dark in both themes (e.g. the auth panel). */
+  /** 'onDark' for surfaces that stay dark in both themes. */
   tone?: 'auto' | 'onDark';
 }) {
   const dims = {
-    sm: { h: 26, text: 'text-lg'  },
-    md: { h: 32, text: 'text-2xl' },
-    lg: { h: 42, text: 'text-3xl' },
+    sm: { h: 28, text: 'text-lg'  },
+    md: { h: 34, text: 'text-2xl' },
+    lg: { h: 44, text: 'text-3xl' },
   } as const;
   const { h, text } = dims[size];
-
   const onDark = tone === 'onDark';
 
   const lockup = (
     <span className="inline-flex items-center gap-2">
-      <svg
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo-mark.webp"
+        alt=""
         width={h}
         height={h}
-        viewBox="0 0 40 40"
-        fill="none"
-        aria-hidden="true"
-        className="shrink-0"
-      >
-        <circle cx="20" cy="20" r="19" className="fill-primary" />
-        {/* Play triangle, optically centred (a geometric centre reads left-heavy). */}
-        <path d="M16.5 13.2 L28 20 L16.5 26.8 Z" fill="white" strokeLinejoin="round" strokeWidth="1.5" stroke="white" />
-      </svg>
+        style={{ width: h, height: h }}
+        className="shrink-0 select-none"
+        draggable={false}
+      />
       <span
         className={cn(
           'font-semibold tracking-tight leading-none whitespace-nowrap',
@@ -63,7 +60,7 @@ export function Logo({
           text,
         )}
       >
-        Omlive<span className={onDark ? 'text-white/70' : 'text-primary'}>Stream</span>
+        Omlive<span className={onDark ? 'text-white/75' : 'text-primary'}>Stream</span>
       </span>
     </span>
   );

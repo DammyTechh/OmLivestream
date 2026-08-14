@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api, unwrap, getApiError } from '@/lib/api';
 import { formatNumber } from '@/lib/utils';
+import { useAuth } from '@/store/auth';
+import { entitlements, UPGRADE_COPY } from '@/lib/entitlements';
 import {
   YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, TwitchIcon,
   XIcon, LinkedInIcon, KickIcon,
@@ -74,6 +76,8 @@ export default function StreamDetailPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [platformMetrics, setPlatformMetrics] = useState<Record<string, PlatformMetrics>>({});
   const [socket, setSocket] = useState<Socket | null>(null);
+  const { user } = useAuth();
+  const ent = entitlements(user?.plan);
   const [replyFor, setReplyFor] = useState<Comment | null>(null);
   const [replyText, setReplyText] = useState('');
   const [filterPlatform, setFilterPlatform] = useState<string>('all');
@@ -164,6 +168,8 @@ export default function StreamDetailPage() {
 
   const sendReply = async () => {
     if (!replyFor || !replyText.trim()) return;
+    // Replying across platforms is a Premium capability.
+    if (!ent.commentReplies) return toast.error(UPGRADE_COPY.commentReplies);
     try {
       await api.post(`/streams/${id}/comments/reply`, {
         platform:   replyFor.platform,

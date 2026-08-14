@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { AuthLayout } from '@/components/auth/AuthLayout';
+import { dashboardUrl } from '@/lib/surface-links';
 import { api, getApiError, unwrap } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 
@@ -92,7 +93,7 @@ export default function VerifyPage() {
       toast.success('Welcome to OmliveStream!');
 
       if (data.isNewUser) router.push('/onboarding');
-      else router.push('/dashboard');
+      else window.location.assign(dashboardUrl());
     } catch (err) {
       toast.error(getApiError(err, 'Invalid or expired code'));
       setCode(['', '', '', '', '', '']);

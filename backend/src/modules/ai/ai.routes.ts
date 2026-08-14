@@ -8,6 +8,7 @@ import { sendSuccess } from '../../utils/response';
 import { supabaseAdmin } from '../../config/supabase';
 import { logger } from '../../config/logger';
 import { AppError } from '../../utils/errors';
+import { PlansService } from '../plans/plans.service';
 import { complete, completeJson } from './ai.client';
 import type { Platform } from '../../types/database';
 
@@ -97,6 +98,22 @@ const titleResultSchema = z.object({
 export async function aiRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.addHook('preHandler', authenticate);
 
+  const plansSvc = new PlansService();
+
+  /**
+   * AI Studio is Premium-only.
+   *
+   * Resolved from the database rather than the JWT's `plan` claim: a token
+   * issued before an upgrade still says 'free', and one issued before a
+   * downgrade or an expired trial still says 'premium'. getEffectivePlan also
+   * settles a lapsed trial, so this cannot be outrun by holding on to an old
+   * token. The generation endpoints below each call it before spending
+   * anything on the model.
+   */
+  async function assertAiAllowed(userId: string): Promise<void> {
+    await plansSvc.enforceAiAccess(userId);
+  }
+
   /**
    * Refuse the call if this account has spent its day's allowance.
    *
@@ -169,6 +186,7 @@ export async function aiRoutes(fastify: FastifyInstance): Promise<void> {
       .from('users').select('plan,full_name').eq('id', u.id).single();
     const plan = profile?.plan ?? 'free';
 
+    await assertAiAllowed(u.id);
     await assertWithinDailyCap(u.id, plan);
 
     // Oldest-first after the reverse, which is the order the model needs.
@@ -271,6 +289,7 @@ export async function aiRoutes(fastify: FastifyInstance): Promise<void> {
 
     const { data: profile } = await supabaseAdmin
       .from('users').select('plan').eq('id', u.id).single();
+    await assertAiAllowed(u.id);
     await assertWithinDailyCap(u.id, profile?.plan ?? 'free');
 
     const prompt = `Generate stream titles and descriptions optimised for each platform.

@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, LogOut } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
+import { paymentUrl } from '@/lib/surface-links';
 import { useAuth } from '@/store/auth';
 import { cn } from '@/lib/utils';
 import { DASHBOARD_NAV, isNavActive } from './nav-items';
@@ -127,7 +128,7 @@ export function MobileNav() {
                     <div className="text-xs font-semibold mb-1">Upgrade to Premium</div>
                     <p className="text-xs text-muted mb-3">Stream to all 8 platforms. Reply to comments. AI video editing.</p>
                     <Link
-                      href="/payment?plan=premium"
+                      href={paymentUrl("?plan=premium")}
                       onClick={() => setOpen(false)}
                       className="block w-full text-center py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition"
                     >

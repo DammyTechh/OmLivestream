@@ -16,9 +16,30 @@ import { PremiumRequiredError, AppError } from '../../utils/errors';
 export type PlanType = 'free_trial' | 'free' | 'premium';
 
 // Hardcoded limits mirror the plan_limits table — no DB roundtrip on every request
+/** Every destination the product supports. Premium reaches all of them. */
+export const ALL_PLATFORMS = [
+  'youtube', 'tiktok', 'instagram', 'facebook', 'twitch', 'twitter', 'linkedin', 'kick',
+] as const;
+
+/**
+ * Destinations available below Premium.
+ *
+ * Note 'twitter' — that is the stored identifier for X across the schema and
+ * the streams enum; the UI label changed, the column value did not.
+ */
+export const FREE_PLATFORMS = ['youtube', 'twitter'] as const;
+
 export const PLAN_LIMITS: Record<PlanType, {
   maxStreamPlatforms: number;
+  /**
+   * WHICH destinations, not just how many. The count limit alone let a free
+   * account stream to any two platforms it liked — picking Twitch and TikTok
+   * passed every check. Naming the allowed set closes that.
+   */
+  allowedPlatforms:   readonly string[];
   canReplyComments:   boolean;
+  /** AI Studio: assistant, title generation, and AI video editing. */
+  canUseAI:           boolean;
   maxStreamsPerDay:   number;
   recordingDays:      number;
   showUpgradePopup:   boolean;
@@ -26,15 +47,22 @@ export const PLAN_LIMITS: Record<PlanType, {
 }> = {
   free_trial: {
     maxStreamPlatforms: 2,
+    allowedPlatforms:   FREE_PLATFORMS,
     canReplyComments:   false,
+    canUseAI:           false,
     maxStreamsPerDay:   3,
+    // Recording stays on below Premium on purpose: someone evaluating the
+    // product has to be able to keep what they made, or a trial produces
+    // nothing to show for it.
     recordingDays:      30,
     showUpgradePopup:   false,
     label:              'Free Trial',
   },
   free: {
     maxStreamPlatforms: 1,
+    allowedPlatforms:   FREE_PLATFORMS,
     canReplyComments:   false,
+    canUseAI:           false,
     maxStreamsPerDay:   1,
     recordingDays:      7,
     showUpgradePopup:   true,
@@ -42,7 +70,9 @@ export const PLAN_LIMITS: Record<PlanType, {
   },
   premium: {
     maxStreamPlatforms: 8,
+    allowedPlatforms:   ALL_PLATFORMS,
     canReplyComments:   true,
+    canUseAI:           true,
     maxStreamsPerDay:   99,
     recordingDays:      365,
     showUpgradePopup:   false,
@@ -192,6 +222,26 @@ export class PlansService {
   async enforcePlatformLimit(userId: string, requestedPlatforms: string[], known?: EffectivePlan): Promise<void> {
     const { plan, limits, trialDaysLeft } = known ?? await this.getEffectivePlan(userId);
 
+    /**
+     * Which destinations, checked before how many.
+     *
+     * The count check on its own was satisfied by any two platforms, so a free
+     * account could stream to Twitch and TikTok simply by asking — the UI hides
+     * those options, but the UI is not what decides. Rejecting by name first
+     * also produces the more useful message: "Twitch is not on your plan" beats
+     * "too many platforms" when they picked two.
+     */
+    const notAllowed = requestedPlatforms.filter((p) => !limits.allowedPlatforms.includes(p));
+    if (notAllowed.length > 0) {
+      const names = notAllowed.map((p) => (p === 'twitter' ? 'X' : p.charAt(0).toUpperCase() + p.slice(1)));
+      throw new AppError(
+        `${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} not available on the ${limits.label} plan. ` +
+        'Free accounts can stream to YouTube and X. Upgrade to Premium for all 8 platforms.',
+        403,
+        'PLATFORM_NOT_ALLOWED'
+      );
+    }
+
     if (requestedPlatforms.length > limits.maxStreamPlatforms) {
       const trialNote = plan === 'free_trial' && trialDaysLeft !== null
         ? ` Your trial (${trialDaysLeft} days left) allows ${limits.maxStreamPlatforms} platform${limits.maxStreamPlatforms > 1 ? 's' : ''}.`
@@ -214,6 +264,20 @@ export class PlansService {
     const { limits } = known ?? await this.getEffectivePlan(userId);
     if (!limits.canReplyComments) {
       throw new PremiumRequiredError('Comment replies');
+    }
+  }
+
+  /**
+   * Enforce: can this user use AI Studio at all?
+   *
+   * Distinct from the daily cap in the AI routes, which rations calls for
+   * accounts that are allowed to make them. This decides whether the account
+   * is allowed at all — below Premium it is not.
+   */
+  async enforceAiAccess(userId: string, known?: EffectivePlan): Promise<void> {
+    const { limits } = known ?? await this.getEffectivePlan(userId);
+    if (!limits.canUseAI) {
+      throw new PremiumRequiredError('AI Studio');
     }
   }
 

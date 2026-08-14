@@ -126,9 +126,10 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
           <Card key={s.label} className="p-5">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: `${s.color}22` }}>
-              <s.icon size={18} style={{ color: s.color }} />
-            </div>
+            {/* Matches the Overview treatment: a quiet outlined glyph rather
+                than a tinted chip per metric. Four differently-coloured tiles
+                implied a colour coding that never existed. */}
+            <s.icon size={17} strokeWidth={1.75} className="text-muted mb-3" />
             <div className="font-display text-3xl font-semibold">
               {loading ? <span className="inline-block w-16 h-8 rounded bg-veil/5 animate-pulse align-middle" /> : formatNumber(s.value)}
             </div>

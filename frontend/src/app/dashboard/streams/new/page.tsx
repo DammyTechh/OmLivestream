@@ -9,7 +9,7 @@ import {
   Radio, Upload, Wifi, WifiOff, Settings2, Sparkles, Monitor,
   Gauge, RefreshCw, AlertTriangle, CheckCircle2, Activity,
   Gamepad2, Palette, Clapperboard, Headphones, Music, Flame, Presentation,
-  SwitchCamera, PictureInPicture2, Repeat2, Info,
+  SwitchCamera, PictureInPicture2, Repeat2, Info, Lock,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
@@ -21,6 +21,9 @@ import {
 } from '@/components/ui/BrandIcons';
 import { measureNetwork, type Progress, type RawMeasurement } from '@/lib/network-test';
 import { useMultiCam, type CamSource } from '@/hooks/useMultiCam';
+import { useAuth } from '@/store/auth';
+import { entitlements, UPGRADE_COPY } from '@/lib/entitlements';
+import { paymentUrl } from '@/lib/surface-links';
 import { VirtualCameraTip } from '@/components/dashboard/VirtualCameraTip';
 
 type SourceMode = 'camera' | 'avatar' | 'image';
@@ -118,6 +121,10 @@ export default function NewStreamPage() {
    * regardless of how many cameras are actually open.
    */
   const cam = useMultiCam({ audio: true });
+  // What this account is allowed to do. Free/trial accounts stream to YouTube
+  // and X only, and cannot switch away from the front camera.
+  const { user } = useAuth();
+  const ent = entitlements(user?.plan);
   const cameraOn = cam.running;
   const [dualBusy, setDualBusy] = useState(false);
   const [showCamTip, setShowCamTip] = useState(true);
@@ -164,6 +171,8 @@ export default function NewStreamPage() {
 
   /** Point the big picture at the other camera (front ⇆ back, or next device). */
   const flipCamera = async () => {
+    // Free accounts broadcast from the front camera only.
+    if (!ent.cameraSwitching) return toast.error(UPGRADE_COPY.cameraSwitching);
     let target: CamSource;
     if (cam.primarySource.kind === 'facing') {
       target = { kind: 'facing', facing: cam.primarySource.facing === 'user' ? 'environment' : 'user' };
@@ -399,7 +408,7 @@ export default function NewStreamPage() {
                     {micOn ? <Mic size={18} /> : <MicOff size={18} />}
                   </button>
                 )}
-                {cameraOn && (
+                {cameraOn && ent.cameraSwitching && (
                   <button
                     onClick={flipCamera}
                     className="w-12 h-12 rounded-full flex items-center justify-center transition shadow-lg bg-veil/10 hover:bg-veil/20 text-text"
@@ -485,7 +494,7 @@ export default function NewStreamPage() {
               already switches them, so this panel would only repeat a control
               the creator can already see — and cost a chunk of a small screen
               to do it. */}
-          {sourceMode === 'camera' && cam.profile.isDesktop && (
+          {sourceMode === 'camera' && cam.profile.isDesktop && ent.cameraSwitching && (
             <Card className="p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <SwitchCamera size={14} className="text-primary" />
@@ -840,24 +849,40 @@ export default function NewStreamPage() {
             <div className="grid grid-cols-2 gap-2 mb-4">
               {PLATFORMS.map((p) => (
                 <div key={p.id} className="relative">
-                  <button
-                    onClick={() => toggle(p.id)}
-                    className={`w-full p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
-                      selected.includes(p.id)
-                        ? 'border-primary bg-primary/10'
-                        : 'border-veil/10 bg-veil/[0.02] hover:border-veil/20'
-                    }`}
-                  >
-                    <p.Icon size={18} />
-                    <span className="text-xs font-medium flex-1">{p.label}</span>
-                  </button>
-                  <button
-                    onClick={() => setShowKeysFor(showKeysFor === p.id ? null : p.id)}
-                    className="absolute top-2 right-2 p-1 rounded-lg bg-veil/5 hover:bg-veil/10 text-muted"
-                    title="Enter stream key manually"
-                  >
-                    <Settings2 size={11} />
-                  </button>
+                  {(() => {
+                    const locked = !ent.platforms.includes(p.id);
+                    return (
+                      <>
+                        <button
+                          onClick={() => locked
+                            ? toast.error(UPGRADE_COPY.platforms)
+                            : toggle(p.id)}
+                          aria-disabled={locked}
+                          title={locked ? UPGRADE_COPY.platforms : p.label}
+                          className={`w-full p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
+                            locked
+                              ? 'border-border bg-veil/[0.02] opacity-45 cursor-not-allowed'
+                              : selected.includes(p.id)
+                                ? 'border-primary bg-primary/10'
+                                : 'border-veil/10 bg-veil/[0.02] hover:border-veil/20'
+                          }`}
+                        >
+                          <p.Icon size={18} />
+                          <span className="text-xs font-medium flex-1">{p.label}</span>
+                          {locked && <Lock size={11} className="text-muted shrink-0" />}
+                        </button>
+                        {!locked && (
+                          <button
+                            onClick={() => setShowKeysFor(showKeysFor === p.id ? null : p.id)}
+                            className="absolute top-2 right-2 p-1 rounded-lg bg-veil/5 hover:bg-veil/10 text-muted"
+                            title="Enter stream key manually"
+                          >
+                            <Settings2 size={11} />
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -894,7 +919,9 @@ export default function NewStreamPage() {
             )}
 
             <p className="text-xs text-muted mt-3">
-              Free plan: up to 2 platforms. Premium: all 8.
+              {ent.maxPlatforms >= 8
+                ? 'Premium — stream to all 8 platforms at once.'
+                : <>Free accounts stream to YouTube and X. <Link href={paymentUrl('?plan=premium')} className="text-primary hover:underline">Upgrade</Link> for all 8.</>}
             </p>
           </Card>
 

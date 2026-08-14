@@ -3,8 +3,9 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Sparkles, CreditCard, Gift, Copy, Check, Tag, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { CreditCard, Gift, Copy, Check, Tag, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/store/auth';
+import { paymentUrl } from '@/lib/surface-links';
 import { api, getApiError } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -144,7 +145,7 @@ function CodeRedeemBox({ onRedeemed }: { onRedeemed: () => void }) {
                 >
                   {redeeming
                     ? <><Loader2 size={14} className="animate-spin" /> Activating…</>
-                    : <><Sparkles size={14} /> Activate Premium free</>}
+                    : "Activate Premium free"}
                 </button>
               )}
               {isDiscount && (
@@ -273,7 +274,7 @@ function BillingContent() {
               </div>
 
               <Link href={`/payment?plan=premium${firstUnusedCode ? `&code=${firstUnusedCode.code}` : ''}`}>
-                <Button icon={<Sparkles size={16} />}>Upgrade &amp; apply reward</Button>
+                <Button>Upgrade &amp; apply reward</Button>
               </Link>
             </div>
           </div>
@@ -285,7 +286,7 @@ function BillingContent() {
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              {isPremium && <Sparkles size={16} className="text-primary" />}
+              
               <span className="text-xs uppercase tracking-widest text-muted">Current Plan</span>
             </div>
             <h2 className="font-display text-4xl font-semibold tracking-tight capitalize mb-2">
@@ -299,7 +300,7 @@ function BillingContent() {
           </div>
           {!isPremium && (
             <Link href={`/payment?plan=premium${firstUnusedCode ? `&code=${firstUnusedCode.code}` : ''}`}>
-              <Button icon={<Sparkles size={16} />}>
+              <Button>
                 {firstUnusedCode ? 'Upgrade with your reward' : 'Upgrade to Premium'}
               </Button>
             </Link>
@@ -335,7 +336,7 @@ function BillingContent() {
             free month or a reward code, adding a card now means it continues when that period
             ends rather than lapsing.
           </p>
-          <Link href="/payment?plan=premium" className="block sm:inline-block">
+          <Link href={paymentUrl("?plan=premium")} className="block sm:inline-block">
             <Button variant="secondary" icon={<CreditCard size={16} />} className="w-full sm:w-auto whitespace-nowrap">
               Add a payment method
             </Button>

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ArrowRight, ArrowLeft, User, Target, Sparkles as SparklesIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Logo } from '@/components/ui/Logo';
+import { dashboardUrl } from '@/lib/surface-links';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { WavyBackground } from '@/components/ui/WavyBackground';
@@ -91,7 +92,7 @@ export default function OnboardingPage() {
         // Also mark onboarding complete for the dashboard prompt
         localStorage.setItem('omlive_onboarded', '1');
         toast.success("Welcome! Your account is ready.");
-        router.push('/dashboard');
+        window.location.assign(dashboardUrl());
       } catch (err) {
         toast.error(getApiError(err, 'Could not save survey'));
         setLoading(false);
@@ -178,7 +179,7 @@ export default function OnboardingPage() {
                   <Input label="Date of Birth (optional)" type="date"
                     value={profile.dob}
                     onChange={(e) => setProfile({ ...profile, dob: e.target.value })} />
-                  <Input label="Location (optional)" value={profile.location}
+                  <Input label="Location" value={profile.location}
                     onChange={(e) => setProfile({ ...profile, location: e.target.value })}
                     placeholder="Lagos, Nigeria" />
                 </div>

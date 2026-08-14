@@ -5,6 +5,9 @@ import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { api, getApiError, unwrap } from '@/lib/api';
+import { useAuth } from '@/store/auth';
+import { entitlements } from '@/lib/entitlements';
+import { PremiumGate } from '@/components/dashboard/PremiumGate';
 
 interface Message { role: 'user' | 'assistant'; content: string; }
 
@@ -21,6 +24,9 @@ const TITLE_PLATFORMS = [
 ] as const;
 
 export default function AIStudioPage() {
+  const { user } = useAuth();
+  const ent = entitlements(user?.plan);
+
   const [mode, setMode] = useState<'chat' | 'title'>('chat');
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: "Hi! I'm your AI streaming assistant. I can help you write stream titles, descriptions, hashtags, and more. What are you streaming today?" },
@@ -86,6 +92,17 @@ export default function AIStudioPage() {
       toast.error(msg);
     } finally { setLoading(false); }
   };
+
+  // AI Studio is a Premium feature. Gated here as well as in the nav so the
+  // page is safe to reach directly by URL or by an old bookmark.
+  if (!ent.ai) {
+    return (
+      <PremiumGate
+        title="AI Studio is part of Premium"
+        description="The AI assistant, title generation and AI video editing are available on Premium. Everything else in your dashboard stays exactly as it is."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl">

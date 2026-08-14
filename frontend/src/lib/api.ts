@@ -127,6 +127,28 @@ function humanize(raw: string): string {
 
 export function getApiError(err: unknown, fallback = 'Something went wrong. Please try again.'): string {
   if (axios.isAxiosError(err)) {
+    /**
+     * Validation errors arrive as a generic "Validation failed" headline with
+     * the useful part — which field, and why — in `details`. Showing only the
+     * headline tells someone their form was rejected but not what to change,
+     * which is how you get a person staring at four filled-in fields with no
+     * idea which one is wrong. Prefer the first specific issue when there is
+     * one, and name the field it belongs to.
+     */
+    const details = err.response?.data?.error?.details;
+    if (Array.isArray(details) && details.length > 0) {
+      const first = details[0] as { message?: string; path?: (string | number)[] };
+      if (first?.message) {
+        const field = Array.isArray(first.path)
+          ? first.path.filter((p) => typeof p === 'string' && p !== 'body').slice(-1)[0]
+          : undefined;
+        const label = typeof field === 'string'
+          ? field.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+          : null;
+        return humanize(label ? `${label}: ${first.message}` : first.message);
+      }
+    }
+
     const serverMsg = err.response?.data?.error?.message
                    || err.response?.data?.message
                    || err.message;

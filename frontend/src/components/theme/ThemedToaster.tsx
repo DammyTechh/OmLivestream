@@ -19,6 +19,7 @@ export function ThemedToaster() {
     <Toaster
       position="top-right"
       toastOptions={{
+        duration: 4000,
         style: {
           background: 'rgb(var(--c-surface))',
           color: 'rgb(var(--c-text))',
@@ -26,6 +27,14 @@ export function ThemedToaster() {
           // A white card on a white page needs a shadow to read as raised;
           // the token already carries the right weight per theme.
           boxShadow: 'var(--shadow-card)',
+          // Messages are sentences, not labels: give them room to wrap and a
+          // comfortable measure instead of one cramped line. The default
+          // padding also sat the text hard against the icon.
+          borderRadius: '12px',
+          padding: '12px 16px',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          maxWidth: '380px',
         },
         success: { iconTheme: { primary: 'rgb(var(--c-primary))', secondary: '#FFFFFF' } },
         error:   { iconTheme: { primary: 'rgb(var(--c-danger))',  secondary: '#FFFFFF' } },
