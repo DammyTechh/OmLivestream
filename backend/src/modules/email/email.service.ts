@@ -11,11 +11,12 @@ const resend = new Resend(env.RESEND_API_KEY);
 // which hosts it at public/logo.png. Previously an imgur hot-link, which
 // meant every transactional email we sent depended on a third-party image
 // host staying up and not rate-limiting us.
-const logo    = `${urls.site.replace(/\/+$/, '')}/logo.png`;
 const bg      = '#07050F';
 const surface = '#0F0C1E';
 const text    = '#F8F5FF';
 const muted   = '#6B6880';
+const brand   = '#6D28D9';
+const line    = 'rgba(255,255,255,0.08)';
 
 // ── Template helpers ──────────────────────────────────────────────
 const wrap = (body: string) => `<!DOCTYPE html><html><head>
@@ -25,12 +26,19 @@ const wrap = (body: string) => `<!DOCTYPE html><html><head>
 <table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};padding:40px 16px;">
 <tr><td align="center">
 <table width="560" cellpadding="0" cellspacing="0" style="background:${surface};border-radius:16px;border:1px solid rgba(124,58,237,0.2);overflow:hidden;max-width:560px;width:100%;">
-<tr><td style="background:linear-gradient(135deg,#7C3AED,#A855F7);padding:28px 40px;text-align:center;">
-  <!-- The logo is a lockup: mark + "OmliveStream" wordmark. The text below
-       it used to be a second wordmark, which read as a doubled brand once
-       the real asset went in. It stays as alt text only, so clients that
-       block images still show the name. -->
-  <img src="${logo}" alt="OmliveStream" style="height:40px;display:block;margin:0 auto;border:0;outline:none;text-decoration:none;">
+<tr><td style="background:${brand};padding:26px 40px;text-align:center;">
+  <!-- The wordmark is set as text, not an image.
+
+       It used to be an <img> pointing at the marketing site's logo.png. Two
+       problems: most clients (Gmail included, for unknown senders) block
+       remote images by default, so the brand simply vanished from the top of
+       every transactional email; and that particular asset sets "Omlive" in a
+       pale lavender tuned for a dark page, which washed out to nearly nothing
+       on a light background. Text always renders, costs no request, and can
+       be given proper contrast. Also a flat brand fill rather than a
+       gradient sweep — several clients drop CSS gradients and fall back to
+       transparent, which left white text on white. -->
+  <span style="font-size:21px;font-weight:700;letter-spacing:-0.02em;color:#FFFFFF;">Omlive<span style="color:#DDD0FB;">Stream</span></span>
 </td></tr>
 ${body}
 <tr><td style="padding:20px 40px;border-top:1px solid rgba(124,58,237,0.15);text-align:center;">
@@ -46,7 +54,7 @@ const row = (label: string, value: string) =>
   `<tr><td style="color:${muted};font-size:14px;padding:6px 0;">${label}</td><td style="color:${text};font-size:14px;text-align:right;padding:6px 0;">${value}</td></tr>`;
 
 const btn = (href: string, label: string) =>
-  `<a href="${href}" style="display:inline-block;background:linear-gradient(135deg,#7C3AED,#A855F7);color:${text};text-decoration:none;padding:13px 28px;border-radius:12px;font-weight:700;font-size:15px;">${label}</a>`;
+  `<a href="${href}" style="display:inline-block;background:${brand};color:#FFFFFF;text-decoration:none;padding:13px 28px;border-radius:10px;font-weight:600;font-size:15px;">${label}</a>`;
 
 // ── Email Service ─────────────────────────────────────────────────
 export class EmailService {
@@ -95,22 +103,73 @@ export class EmailService {
   }
 
   // ── 3. Payment receipt ─────────────────────────────────────────
-  async sendReceiptEmail(to: string, d: { amount: number; reference: string; plan: string; billingCycle: string }): Promise<void> {
+  /**
+   * The receipt a customer keeps.
+   *
+   * Paystack sends its own receipt as well, from noreply@paystack.com. That
+   * one is theirs — its layout lives in the Paystack dashboard, not in this
+   * codebase, and nothing here can restyle it. This is the receipt we control,
+   * so it carries the things a customer actually needs later: what they bought,
+   * for which period, what card it went on, and when the next charge lands.
+   *
+   * Every enriched field is optional. The webhook may not carry card details
+   * for every channel (bank transfer, USSD), and a receipt is not the place to
+   * print "undefined" — absent fields are simply omitted.
+   */
+  async sendReceiptEmail(to: string, d: {
+    amount: number;
+    reference: string;
+    plan: string;
+    billingCycle: string;
+    cardBrand?: string | null;
+    cardLast4?: string | null;
+    channel?: string | null;
+    paidAt?: string | null;
+    nextBillingDate?: string | null;
+  }): Promise<void> {
     const amount = new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(d.amount / 100);
+    const paid = d.paidAt ? new Date(d.paidAt) : new Date();
+    const paidStr = paid.toLocaleDateString('en-NG', { dateStyle: 'long' });
+
+    // "Visa ending 4081" where we know it, otherwise the channel ("bank
+    // transfer"), otherwise nothing at all rather than a blank row.
+    const method = d.cardLast4
+      ? `${(d.cardBrand ?? 'Card').replace(/^\w/, (c) => c.toUpperCase())} ending ${d.cardLast4}`
+      : d.channel
+        ? d.channel.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase())
+        : null;
+
+    const cycleLabel = d.billingCycle === 'annual' ? 'Annual' : 'Monthly';
+    const nextStr = d.nextBillingDate
+      ? new Date(d.nextBillingDate).toLocaleDateString('en-NG', { dateStyle: 'long' })
+      : null;
+
     const html = wrap(`<tr><td style="padding:36px 40px;">
-      <div style="text-align:center;margin-bottom:28px;">
-        <span style="display:inline-block;background:rgba(16,185,129,0.15);color:#10B981;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:5px 12px;border-radius:99px;margin-bottom:14px;">Payment received</span>
-        <h2 style="color:${text};font-size:22px;font-weight:700;margin:0;">Payment successful</h2>
+      <div style="text-align:center;margin-bottom:26px;">
+        <div style="color:#10B981;font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;">Payment received</div>
+        <div style="color:${text};font-size:32px;font-weight:700;letter-spacing:-0.02em;">${amount}</div>
+        <div style="color:${muted};font-size:13px;margin-top:6px;">Paid on ${paidStr}</div>
       </div>
-      <table width="100%" style="background:#14102A;border-radius:12px;padding:20px;margin-bottom:24px;">
-        ${row('Plan', `${d.plan} (${d.billingCycle})`)}
-        ${row('Amount', `<span style="color:#10B981;font-weight:700;">${amount}</span>`)}
-        ${row('Reference', `<span style="font-family:monospace;font-size:12px;">${d.reference}</span>`)}
-        ${row('Date', new Date().toLocaleDateString('en-NG', { dateStyle: 'long' }))}
+
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#14102A;border-radius:12px;padding:20px;margin-bottom:20px;">
+        ${row('Plan', `OmliveStream ${d.plan}`)}
+        ${row('Billing', cycleLabel)}
+        ${method ? row('Paid with', method) : ''}
+        ${nextStr ? row('Next charge', nextStr) : ''}
+        <tr><td colspan="2" style="border-top:1px solid ${line};padding-top:12px;"></td></tr>
+        ${row('Total paid', `<span style="color:#10B981;font-weight:700;">${amount}</span>`)}
       </table>
-      ${btn(`${urls.dashboard}/dashboard`, 'Go to Dashboard →')}
+
+      <p style="color:${muted};font-size:12px;line-height:1.7;margin:0 0 22px;">
+        Reference <span style="font-family:monospace;color:${text};">${d.reference}</span><br>
+        Keep this email for your records. You can also view every invoice under
+        Billing in your dashboard.
+      </p>
+
+      <div style="text-align:center;">${btn(`${urls.dashboard}/dashboard/billing`, 'View billing')}</div>
     </td></tr>`);
-    await this.send(to, `OmliveStream — Payment confirmed: ${amount}`, html);
+
+    await this.send(to, `Your OmliveStream receipt — ${amount}`, html);
   }
 
   // ── 4. Subscription cancelled ──────────────────────────────────

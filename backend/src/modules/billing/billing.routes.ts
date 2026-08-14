@@ -553,7 +553,23 @@ async function handlePaystackEvent(event: string, data: Record<string, unknown>)
     await supabaseAdmin.from('users').update({ plan: 'premium' }).eq('id', userId);
     await supabaseAdmin.from('invoices').insert({ id: uuidv4(), user_id: userId, amount: data.amount as number, currency: 'NGN', status: 'paid', paystack_reference: ref });
     const { data: p } = await supabaseAdmin.from('users').select('email').eq('id', userId).single();
-    if (p) await emailService.sendReceiptEmail(p.email, { amount: data.amount as number, reference: ref, plan: 'Premium', billingCycle: bc });
+    if (p) {
+      // The charge payload already carries the card and channel Paystack used,
+      // so the receipt can name it without a second API call. `authorization`
+      // is absent for some channels, hence the optional reads.
+      const auth = (data.authorization ?? {}) as Record<string, unknown>;
+      await emailService.sendReceiptEmail(p.email, {
+        amount: data.amount as number,
+        reference: ref,
+        plan: 'Premium',
+        billingCycle: bc,
+        cardBrand: (auth.brand as string) ?? (auth.card_type as string) ?? null,
+        cardLast4: (auth.last4 as string) ?? null,
+        channel: (data.channel as string) ?? null,
+        paidAt: (data.paid_at as string) ?? null,
+        nextBillingDate: end.toISOString(),
+      });
+    }
 
     // The receipt goes to their inbox; this is what they see in the product.
     // It matters more here than elsewhere because the upgrade completes on
