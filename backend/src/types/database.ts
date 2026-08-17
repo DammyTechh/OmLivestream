@@ -414,9 +414,18 @@ export interface Database {
           ip_address: string | null;
           read_at:    string | null;
           replied_at: string | null;
+          /** 'contact' for the public form, 'stream_feedback' for post-broadcast ratings. */
+          source:     string;
+          /** Present only on stream_feedback rows. */
+          rating:     number | null;
           created_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['contact_submissions']['Row'], 'created_at'>;
+        // ip_address, source and rating all have defaults or are optional, so
+        // the public contact form keeps inserting exactly as it did.
+        Insert: Omit<Database['public']['Tables']['contact_submissions']['Row'],
+                     'created_at' | 'source' | 'rating' | 'ip_address' | 'read_at' | 'replied_at'>
+              & { created_at?: string; source?: string; rating?: number | null;
+                  ip_address?: string | null; read_at?: string | null; replied_at?: string | null };
         Update: Partial<Database['public']['Tables']['contact_submissions']['Insert']>;
       };
     };

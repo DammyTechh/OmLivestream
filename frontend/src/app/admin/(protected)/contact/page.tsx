@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { MessageSquare, Mail, Check, Send, Trash2, X } from 'lucide-react';
+import { MessageSquare, Mail, Check, Send, Trash2, X, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
@@ -16,22 +16,33 @@ interface ContactSubmission {
   ip_address: string | null;
   read_at: string | null;
   replied_at: string | null;
+  /** 'contact' from the public form, 'stream_feedback' from a finished broadcast. */
+  source: 'contact' | 'stream_feedback';
+  /** Only present on stream_feedback rows. */
+  rating: number | null;
   created_at: string;
 }
 
 function ContactInboxContent() {
   const [items, setItems] = useState<ContactSubmission[]>([]);
   const [filter, setFilter] = useState<'all' | 'unread' | 'read' | 'replied'>('all');
+  // Feedback and contact-form messages arrive in the same inbox but get read
+  // differently — one is a support request, the other is product signal — so
+  // they can be separated without leaving the page.
+  const [source, setSource] = useState<'all' | 'contact' | 'stream_feedback'>('all');
   const [selected, setSelected] = useState<ContactSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [counts, setCounts] = useState({ unread: 0, read: 0, replied: 0 });
 
-  useEffect(() => { fetchItems(); }, [filter]);
+  useEffect(() => { fetchItems(); }, [filter, source]);
 
   async function fetchItems() {
     setLoading(true);
     try {
-      const url = filter === 'all' ? '/contact/admin/list?limit=100' : `/contact/admin/list?status=${filter}&limit=100`;
+      const params = new URLSearchParams({ limit: '100' });
+      if (filter !== 'all') params.set('status', filter);
+      if (source !== 'all') params.set('source', source);
+      const url = `/contact/admin/list?${params.toString()}`;
       const res = await api.get(url);
       const data = (res.data?.data || []) as ContactSubmission[];
       setItems(data);
@@ -109,6 +120,26 @@ function ContactInboxContent() {
         ))}
       </div>
 
+      <div className="flex gap-2 flex-wrap">
+        {([
+          { id: 'all',             label: 'Everything'    },
+          { id: 'contact',         label: 'Contact form'  },
+          { id: 'stream_feedback', label: 'Stream feedback' },
+        ] as const).map((sfilter) => (
+          <button
+            key={sfilter.id}
+            onClick={() => setSource(sfilter.id)}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-medium transition border ${
+              source === sfilter.id
+                ? 'bg-veil/10 border-veil/25 text-text'
+                : 'bg-transparent border-border text-muted hover:text-text'
+            }`}
+          >
+            {sfilter.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid lg:grid-cols-[1fr_1.3fr] gap-4 min-h-[calc(100vh-300px)]">
         {/* List */}
         <div className="space-y-2 overflow-y-auto">
@@ -131,11 +162,29 @@ function ContactInboxContent() {
             >
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="font-medium truncate">{item.name}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full capitalize ${statusBadge(item.status)}`}>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full capitalize shrink-0 ${statusBadge(item.status)}`}>
                   {item.status}
                 </span>
               </div>
-              <div className="text-xs text-muted mb-2 truncate">{item.email}</div>
+              <div className="flex items-center gap-2 mb-2">
+                {item.source === 'stream_feedback' && (
+                  <>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-veil/10 border border-border text-muted shrink-0">
+                      Feedback
+                    </span>
+                    {item.rating != null && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold shrink-0"
+                        title={`${item.rating} out of 5`}
+                      >
+                        <Star size={11} className="text-primary" fill="currentColor" />
+                        {item.rating}/5
+                      </span>
+                    )}
+                  </>
+                )}
+                <span className="text-xs text-muted truncate">{item.email}</span>
+              </div>
               <div className="text-sm text-muted line-clamp-2">{item.message}</div>
               <div className="text-[11px] text-subtle mt-2">{timeAgo(item.created_at)}</div>
             </button>

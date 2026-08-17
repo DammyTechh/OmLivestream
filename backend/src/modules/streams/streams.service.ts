@@ -381,6 +381,49 @@ export class StreamsService {
       }, { onConflict: 'user_id,stream_id' });
 
     if (error) throw error;
+
+    /**
+     * Also drop it in the admin inbox.
+     *
+     * The table above is the record of truth for counting and charting, but a
+     * rating nobody reads changes nothing. contact_submissions is what the
+     * admin Contact Inbox already lists, marks read and replies from, so
+     * writing a copy there means feedback lands where an admin is already
+     * looking instead of on a screen they have to remember to open.
+     *
+     * Wrapped and swallowed: this is a convenience copy. If it fails, the real
+     * feedback row is already saved, and the creator must not see an error for
+     * something that did in fact record.
+     */
+    try {
+      const { data: profile } = await supabaseAdmin
+        .from('users').select('full_name,email').eq('id', userId).single();
+
+      const stars = '★'.repeat(input.rating) + '☆'.repeat(5 - input.rating);
+      const verdict = ['Bad', 'Poor', 'Okay', 'Good', 'Great'][input.rating - 1] ?? '';
+      const lines = [
+        `${stars}  ${input.rating}/5 — ${verdict}`,
+        `Broadcast was ${input.endedReason === 'cancelled' ? 'cancelled' : 'completed'}.`,
+      ];
+      if (input.issues?.length) {
+        // Slugs are for machines; the inbox is read by a person.
+        lines.push('', `Reported problems: ${input.issues.map((i) => i.replace(/_/g, ' ')).join(', ')}`);
+      }
+      if (input.comment?.trim()) lines.push('', input.comment.trim());
+      lines.push('', `Stream ID: ${streamId}`);
+
+      await supabaseAdmin.from('contact_submissions').insert({
+        id:      uuidv4(),
+        name:    profile?.full_name || 'OmliveStream creator',
+        email:   profile?.email || 'unknown@omlivestream.com',
+        message: lines.join('\n'),
+        status:  'unread',
+        source:  'stream_feedback',
+        rating:  input.rating,
+      });
+    } catch (err) {
+      logger.warn({ err, userId, streamId }, 'Feedback saved but could not be copied to the admin inbox');
+    }
   }
 
   async end(userId: string, streamId: string): Promise<void> {

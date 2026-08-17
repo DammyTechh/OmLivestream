@@ -23,32 +23,39 @@ export const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@o
 export const SALES_EMAIL   = process.env.NEXT_PUBLIC_SALES_EMAIL   || 'sales@omlivestream.com';
 
 /**
- * Official social profiles, surfaced in the footer.
+ * Official social profiles, surfaced in the footer and in the homepage
+ * Organization structured data.
  *
- * Env-overridable and keyed by handle, not full URL, so the handle is stated
- * once and each platform's URL shape lives in one place. An empty value hides
- * that link entirely — better a short row of real links than a full row where
- * half 404. Set NEXT_PUBLIC_SOCIAL_* to change a handle without a code edit.
+ * Full URLs rather than handles. The previous version derived each URL from a
+ * handle, which is tidier but cannot express a Facebook page that has no
+ * vanity username — and every handle defaulted to a placeholder, so all six
+ * links pointed at profiles that were not ours.
+ *
+ * These same URLs are emitted as `sameAs` in the homepage JSON-LD, which is how
+ * Google ties the accounts to the organisation. That makes accuracy here worth
+ * more than tidiness: a wrong URL in `sameAs` associates someone else's account
+ * with the brand. Each is env-overridable, and an empty value hides the link.
  */
-const handle = (v: string | undefined, fallback: string) =>
-  (v ?? fallback).replace(/^@/, '').trim();
+const social = (v: string | undefined, fallback: string) => (v ?? fallback).trim();
 
-export const SOCIAL_HANDLE = {
-  youtube:   handle(process.env.NEXT_PUBLIC_SOCIAL_YOUTUBE,   'omlivestream'),
-  tiktok:    handle(process.env.NEXT_PUBLIC_SOCIAL_TIKTOK,    'omlivestream'),
-  instagram: handle(process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM, 'omlivestream'),
-  facebook:  handle(process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK,  'omlivestream'),
-  x:         handle(process.env.NEXT_PUBLIC_SOCIAL_X,         'omlivestream'),
-  threads:   handle(process.env.NEXT_PUBLIC_SOCIAL_THREADS,   'omlivestream'),
+export const SOCIAL_URL = {
+  youtube:   social(process.env.NEXT_PUBLIC_SOCIAL_YOUTUBE,   'https://www.youtube.com/@omlivestream_madeeasy'),
+  tiktok:    social(process.env.NEXT_PUBLIC_SOCIAL_TIKTOK,    'https://www.tiktok.com/@omlivestreammade'),
+  instagram: social(process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM, 'https://www.instagram.com/omlivestream_madeeasy'),
+  // A /share/ link, not a vanity URL. It resolves, but a canonical
+  // facebook.com/<pagename> URL is a stronger `sameAs` signal — set the env var
+  // once the Page has a username.
+  facebook:  social(process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK,  'https://www.facebook.com/share/1GnjmjSrtF/'),
+  x:         social(process.env.NEXT_PUBLIC_SOCIAL_X,         'https://x.com/omlive_stream'),
+  threads:   social(process.env.NEXT_PUBLIC_SOCIAL_THREADS,   'https://www.threads.com/@omlivestream_madeeasy'),
 } as const;
 
-export type SocialKey = keyof typeof SOCIAL_HANDLE;
+export type SocialKey = keyof typeof SOCIAL_URL;
 
-export const SOCIAL_URL: Record<SocialKey, string> = {
-  youtube:   `https://www.youtube.com/@${SOCIAL_HANDLE.youtube}`,
-  tiktok:    `https://www.tiktok.com/@${SOCIAL_HANDLE.tiktok}`,
-  instagram: `https://www.instagram.com/${SOCIAL_HANDLE.instagram}`,
-  facebook:  `https://www.facebook.com/${SOCIAL_HANDLE.facebook}`,
-  x:         `https://x.com/${SOCIAL_HANDLE.x}`,
-  threads:   `https://www.threads.net/@${SOCIAL_HANDLE.threads}`,
-};
+/** Handles, derived from the URLs above — used for display (@name) only. */
+export const SOCIAL_HANDLE: Record<SocialKey, string> = Object.fromEntries(
+  Object.entries(SOCIAL_URL).map(([k, url]) => {
+    const last = url.replace(/\/+$/, '').split('/').pop() ?? '';
+    return [k, last.replace(/^@/, '').split('?')[0]];
+  }),
+) as Record<SocialKey, string>;

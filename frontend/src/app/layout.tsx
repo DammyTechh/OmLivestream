@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SITE_URL } from '@/lib/urls';
 import { Fraunces, DM_Sans, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { ThemedToaster } from '@/components/theme/ThemedToaster';
@@ -8,7 +9,16 @@ const fraunces  = Fraunces({ subsets: ['latin'], variable: '--font-fraunces', di
 const dmSans    = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans', display: 'swap', weight: ['400','500','700'] });
 const jetbrains = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains', display: 'swap', weight: ['400','500','600'] });
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://omlivestream.com';
+// Imported, not redefined.
+//
+// This file used to declare its own SITE_URL from NEXT_PUBLIC_APP_URL with a
+// non-www fallback, while lib/urls.ts reads NEXT_PUBLIC_SITE_URL (which is set
+// to the www host). The result was a page whose canonical tag and Open Graph
+// URL said omlivestream.com while its sitemap and Organization JSON-LD said
+// www.omlivestream.com — two hosts Google treats as different sites, competing
+// with each other and splitting the brand identity between them.
+//
+// One constant, one host, everywhere.
 
 const TITLE = 'OmliveStream — Stream Smarter. Reach Faster. Broadcast Anywhere.';
 const DESCRIPTION =
@@ -19,6 +29,12 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   applicationName: 'OmliveStream',
+  // Canonical URL. Google treats www and non-www as separate sites, so the
+  // canonical tag, the sitemap URLs, the redirects and the Organization `url`
+  // and `@id` in the JSON-LD must all agree on one host — otherwise the same
+  // pages compete with themselves and the brand identity is split in two.
+  // SITE_URL is that single source of truth.
+  alternates: { canonical: '/' },
   // All self-hosted from public/. These were previously hot-linked from an
   // imgur URL, which put the brand — and every page's favicon — behind a
   // third party with no uptime commitment to us.
@@ -40,6 +56,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
+    site: '@omlive_stream',
+    creator: '@omlive_stream',
     title: TITLE,
     description: DESCRIPTION,
     images: ['/og-image.png'],

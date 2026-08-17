@@ -67,3 +67,42 @@ begin
       with check (auth.uid() = user_id);
   end if;
 end $$;
+
+
+-- ────────────────────────────────────────────────────────────────────
+--  Surfacing feedback in the admin inbox
+-- ────────────────────────────────────────────────────────────────────
+--
+-- The structured table above is the record of truth — it is what you count,
+-- average and chart. But a number nobody reads is worth nothing, so each piece
+-- of feedback is also written into contact_submissions, which is what the
+-- admin Contact Inbox already reads, marks unread/read/replied, and can reply
+-- from. Admins then see feedback arrive in the same place as everything else
+-- rather than needing a second screen they have to remember to check.
+--
+-- `source` keeps the two kinds apart so the inbox can label them and filter.
+-- It defaults to 'contact' so every existing row stays correct without a
+-- back-fill, and the public contact form needs no change.
+--
+-- `rating` is denormalised onto the inbox row purely so the list can show it
+-- without joining; stream_feedback remains the authority.
+
+alter table contact_submissions
+  add column if not exists source text     not null default 'contact',
+  add column if not exists rating smallint;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'contact_submissions_source_check'
+  ) then
+    alter table contact_submissions
+      add constraint contact_submissions_source_check
+      check (source in ('contact', 'stream_feedback'));
+  end if;
+end $$;
+
+create index if not exists idx_contact_submissions_source on contact_submissions (source, created_at desc);
+
+comment on column contact_submissions.source is
+  '''contact'' for the public form, ''stream_feedback'' for post-broadcast ratings.';

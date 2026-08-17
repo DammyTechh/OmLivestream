@@ -16,6 +16,9 @@ const listQuery = z.object({
   page:   z.coerce.number().min(1).default(1),
   limit:  z.coerce.number().min(1).max(100).default(20),
   status: z.enum(['unread','read','replied']).optional(),
+  // Lets the inbox separate post-broadcast ratings from public contact-form
+  // messages; omitted means everything, which keeps the default view whole.
+  source: z.enum(['contact','stream_feedback']).optional(),
 });
 
 export async function contactRoutes(fastify: FastifyInstance): Promise<void> {
@@ -84,6 +87,7 @@ export async function contactRoutes(fastify: FastifyInstance): Promise<void> {
       .range(from, to);
 
     if (q.status) qb = qb.eq('status', q.status);
+    if (q.source) qb = qb.eq('source', q.source);
 
     const { data, count } = await qb;
     sendSuccess(reply, data ?? [], undefined, 200, paginateMeta(count ?? 0, q.page, q.limit));

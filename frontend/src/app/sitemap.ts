@@ -26,6 +26,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/about',    priority: 0.8, changeFrequency: 'monthly' },
     { path: '/waitlist', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/privacy',  priority: 0.3, changeFrequency: 'yearly'  },
+    // Linked from the Meta app settings and the privacy policy; needs to be
+    // crawlable and stable, since app review checks that it resolves.
+    { path: '/data-deletion', priority: 0.3, changeFrequency: 'yearly' },
     { path: '/terms',    priority: 0.3, changeFrequency: 'yearly'  },
   ];
 
