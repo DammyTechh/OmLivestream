@@ -22,8 +22,17 @@ const PROVIDERS: { id: SocialProvider; label: string }[] = [
   { id: 'google',    label: 'Google'    },
   { id: 'facebook',  label: 'Facebook'  },
   { id: 'instagram', label: 'Instagram' },
-  { id: 'tiktok',    label: 'TikTok'    },
-  { id: 'twitch',    label: 'Twitch'    },
+  // TikTok and Twitch are deliberately absent from *sign-in*.
+  //
+  // Neither adds a way in that Google, Facebook or an email code does not
+  // already cover, and both cost something to keep: TikTok's login product
+  // needs its own review, and Twitch will not issue credentials until the
+  // account clears 2FA. A button that opens a provider error page is worse
+  // than no button.
+  //
+  // This is only about signing in. Both remain fully available as broadcast
+  // destinations under Platforms, which is a different set of credentials
+  // (TIKTOK_CLIENT_KEY / TWITCH_CLIENT_ID) and a different callback path.
 ];
 
 export async function authRoutes(fastify: FastifyInstance): Promise<void> {

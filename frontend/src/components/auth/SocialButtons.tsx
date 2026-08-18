@@ -26,8 +26,15 @@ const GRID_COLS: Record<number, string> = {
   1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4', 5: 'grid-cols-5',
 };
 
-/** Shown until the API says which providers it can actually serve. */
-const OPTIMISTIC: Provider[] = ['google', 'facebook', 'instagram', 'twitch'];
+/**
+ * Shown for the moment before the API replies with the real list.
+ *
+ * Kept in step with the server's PROVIDERS list — TikTok and Twitch are no
+ * longer sign-in options, so listing them here would flash two buttons that
+ * vanish a beat later, and any click landing in that window would open a
+ * provider error page.
+ */
+const OPTIMISTIC: Provider[] = ['google', 'facebook', 'instagram'];
 
 export function SocialButtons({ label = 'or continue with' }: { label?: string }) {
   const [loading, setLoading]   = useState<Provider | null>(null);
