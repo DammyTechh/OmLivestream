@@ -9,6 +9,8 @@ import { entitlements } from '@/constants/entitlements';
 import { Screen } from '@/components/Screen';
 import { Card, Txt, Badge, Button, EmptyState } from '@/components/ui';
 import { Icon, type IconName } from '@/components/Icon';
+import { Logo } from '@/components/Logo';
+import { UpgradeSheet } from '@/components/UpgradeSheet';
 
 interface Overview {
   totalViews?: number;
@@ -46,6 +48,7 @@ export default function OverviewScreen() {
   const [recent, setRecent] = useState<Stream[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const load = useCallback(async () => {
     // Settled, not all: a failing analytics call must not blank the stream
@@ -83,6 +86,9 @@ export default function OverviewScreen() {
       subtitle={user?.plan === 'premium' ? 'Premium' : 'Free plan'}
       refreshing={refreshing}
       onRefresh={onRefresh}
+      /* Sits above the greeting, not in the sticky bar — the bar carries the
+         screen name once you scroll, and a logo there would displace it. */
+      aboveTitle={<Logo size={26} />}
     >
       <View style={{ paddingHorizontal: gutter, gap: space.lg }}>
 
@@ -175,10 +181,11 @@ export default function OverviewScreen() {
               platform, and use AI Studio. You&apos;re currently limited to{' '}
               {ent.maxPlatforms === 1 ? 'one platform' : 'two platforms'}.
             </Txt>
-            <Button title="See Premium" variant="secondary" onPress={() => nav.navigate('Settings')} />
+            <Button title="See Premium" variant="secondary" onPress={() => setUpgradeOpen(true)} />
           </Card>
         )}
       </View>
+      <UpgradeSheet visible={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </Screen>
   );
 }

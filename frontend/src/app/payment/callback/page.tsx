@@ -12,9 +12,30 @@ import { DASHBOARD_URL, SUPPORT_EMAIL } from '@/lib/urls';
 
 type State = 'checking' | 'active' | 'pending';
 
+/**
+ * Schemes this page may hand control back to.
+ *
+ * The mobile app opens checkout here and waits for a redirect to its own
+ * scheme. Anything outside this list is ignored and the browser simply stays
+ * put — the parameter arrives in a URL a user could edit, so redirecting
+ * wherever it points would let an attacker route a completed payment's
+ * callback to a host they control.
+ */
+const APP_RETURN_PREFIXES = ['omlivestream://'];
+const DEV_RETURN = /^(exp:\/\/[\w.:-]+\/--\/|exp\+[\w-]+:\/\/)/;
+
+function safeAppReturn(url: string | null): string | null {
+  if (!url) return null;
+  if (APP_RETURN_PREFIXES.some((p) => url.startsWith(p))) return url;
+  // Expo Go during development only — never on the live site.
+  if (process.env.NODE_ENV !== 'production' && DEV_RETURN.test(url)) return url;
+  return null;
+}
+
 function CallbackContent() {
   const params    = useSearchParams();
   const reference = params.get('reference') ?? params.get('trxref');
+  const appReturn = safeAppReturn(params.get('app_return'));
   const [state, setState] = useState<State>('checking');
 
   // Paystack redirects here right after payment, but the subscription is
@@ -46,6 +67,25 @@ function CallbackContent() {
     poll();
     return () => { cancelled = true; };
   }, []);
+
+  /**
+   * Hand back to the app once the outcome is known.
+   *
+   * Only after polling settles, so the app is told what actually happened
+   * rather than "we redirected you somewhere". `pending` is its own status
+   * because a slow webhook is not a failure — the app shows "processing"
+   * rather than telling someone their payment failed when it did not.
+   */
+  useEffect(() => {
+    if (!appReturn || state === 'checking') return;
+    const sep = appReturn.includes('?') ? '&' : '?';
+    const url = `${appReturn}${sep}status=${state}` +
+                (reference ? `&reference=${encodeURIComponent(reference)}` : '');
+    // A short beat so the result is visible for a moment before the browser
+    // closes — an instant dismissal reads as though nothing happened.
+    const timer = setTimeout(() => { window.location.href = url; }, 900);
+    return () => clearTimeout(timer);
+  }, [appReturn, state, reference]);
 
   return (
     <main className="min-h-screen flex items-center justify-center px-6 py-20">

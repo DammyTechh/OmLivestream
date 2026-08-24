@@ -70,6 +70,7 @@ export async function billingRoutes(fastify: FastifyInstance): Promise<void> {
             plan: { type: 'string', enum: ['premium'] },
             billingCycle: { type: 'string', enum: ['monthly','annual'] },
             paymentMethod: { type: 'string', enum: ['card','google_pay'], default: 'card' },
+            appReturn: { type: 'string', maxLength: 300, description: 'Native deep link to return to after payment. Allowlisted server-side; anything else is ignored.' },
             discountCode: { type: 'string', maxLength: 64 },
           } },
       },
@@ -154,9 +155,37 @@ export async function billingRoutes(fastify: FastifyInstance): Promise<void> {
         }
       }
 
+      /**
+       * Only our own app scheme, and only Expo Go's while developing.
+       * Anything else is dropped and the flow falls back to the website — a
+       * slightly worse experience is the right trade against handing a
+       * post-payment redirect to an arbitrary host.
+       */
+      const rawReturn = (req.body as { appReturn?: string })?.appReturn;
+      const appReturn =
+        rawReturn && (
+          rawReturn.startsWith('omlivestream://') ||
+          (env.NODE_ENV !== 'production' &&
+            (/^exp:\/\/[\w.:-]+\/--\//.test(rawReturn) || /^exp\+[\w-]+:\/\//.test(rawReturn)))
+        )
+          ? rawReturn
+          : undefined;
+
       const body: Record<string, unknown> = {
         email: profile?.email ?? u.email, amount, currency: cfg.currency, reference,
-        callback_url: `${urls.payment}/callback`,
+        /**
+         * Where Paystack sends the browser afterwards.
+         *
+         * A native client passes its own deep link as `appReturn`; it is
+         * carried through here so the callback page knows to hand control back
+         * to the app rather than leaving someone on a web page with no way
+         * home. Validated against an allowlist below — Paystack will redirect
+         * a real browser to whatever this says, so an unchecked value would be
+         * an open redirect at the end of a completed payment.
+         */
+        callback_url: appReturn
+          ? `${urls.payment}/callback?app_return=${encodeURIComponent(appReturn)}`
+          : `${urls.payment}/callback`,
         metadata: {
           userId: u.id, plan, billingCycle, paymentMethod,
           discountCode:      discount?.code ?? null,

@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Image, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop, RadialGradient } from 'react-native-svg';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withRepeat,
   withSequence, withDelay, Easing, runOnJS,
 } from 'react-native-reanimated';
 import { useTheme } from '@/hooks/useTheme';
+import { Logo } from './Logo';
 
 /**
  * The animated splash.
@@ -166,11 +167,19 @@ export function AnimatedSplash({
             haloStyle,
           ]}
         />
-        <Animated.View style={markStyle}>
-          <Svg width={markSize} height={markSize} viewBox="0 0 40 40">
-            <Circle cx="20" cy="20" r="19" fill={t.primary} />
-            <Path d="M16.5 13.2 L28 20 L16.5 26.8 Z" fill="#FFFFFF" />
-          </Svg>
+        {/* Mark + wordmark, matching the still the OS showed a moment ago.
+            Showing a different composition here makes the handoff visibly
+            jump, which is the one thing this whole two-stage dance exists to
+            avoid. The two breathe together as one lockup. */}
+        <Animated.View style={[markStyle, { alignItems: 'center' }]}>
+          <Image
+            source={require('../../assets/logo-mark.png')}
+            style={{ width: markSize, height: markSize }}
+            resizeMode="contain"
+          />
+          <View style={{ marginTop: markSize * 0.16 }}>
+            <Logo size={markSize * 0.30} showWordmark onDark={isDark} showMark={false} />
+          </View>
         </Animated.View>
       </View>
     </Animated.View>

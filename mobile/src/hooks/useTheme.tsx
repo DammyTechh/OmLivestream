@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme, useWindowDimensions, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { dark, light, type Theme } from '@/constants/theme';
 
 /**
@@ -19,9 +20,14 @@ import { dark, light, type Theme } from '@/constants/theme';
  *     capped content column rather than text stretched to 1000pt.
  */
 
+export type ThemePref = 'light' | 'dark' | 'system';
+
 interface ThemeContextValue {
   t: Theme;
   isDark: boolean;
+  /** What the user chose. 'system' follows the OS. */
+  pref: ThemePref;
+  setPref: (p: ThemePref) => void;
   /** Breakpoint class, derived from the shorter edge so rotation is stable. */
   layout: 'compact' | 'regular' | 'expanded';
   /** Horizontal page padding appropriate to the layout class. */
@@ -34,12 +40,39 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+const PREF_KEY = 'omlive_theme_pref';
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const scheme = useColorScheme();
   const { width, height } = useWindowDimensions();
 
+  /**
+   * Light by default, matching the website.
+   *
+   * The previous default was `scheme !== 'light'`, which meant *dark* unless
+   * the OS explicitly said light — so a phone with no preference set opened a
+   * dark app while omlivestream.com opened light. Two faces of one product
+   * should not disagree about something this visible.
+   *
+   * 'light' is therefore the starting point, and the choice is the user's from
+   * there. Persisted, because a preference that resets every launch is not a
+   * preference.
+   */
+  const [pref, setPrefState] = useState<ThemePref>('light');
+
+  useEffect(() => {
+    AsyncStorage.getItem(PREF_KEY)
+      .then((v) => { if (v === 'light' || v === 'dark' || v === 'system') setPrefState(v); })
+      .catch(() => { /* first run, or storage unavailable */ });
+  }, []);
+
+  const setPref = React.useCallback((p: ThemePref) => {
+    setPrefState(p);
+    AsyncStorage.setItem(PREF_KEY, p).catch(() => { /* non-fatal */ });
+  }, []);
+
   const value = useMemo<ThemeContextValue>(() => {
-    const isDark = scheme !== 'light';
+    const isDark = pref === 'system' ? scheme === 'dark' : pref === 'dark';
     // The shorter edge classifies the device: a phone in landscape is still a
     // phone, and shouldn't suddenly adopt tablet layout.
     const shortest = Math.min(width, height);
@@ -50,12 +83,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return {
       t: isDark ? dark : light,
       isDark,
+      pref,
+      setPref,
       layout,
       gutter: layout === 'compact' ? 14 : layout === 'regular' ? 18 : 28,
       maxContentWidth: layout === 'expanded' ? 720 : width,
       columns: layout === 'expanded' ? 3 : 2,
     };
-  }, [scheme, width, height]);
+  }, [scheme, width, height, pref, setPref]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

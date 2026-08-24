@@ -263,9 +263,34 @@ export class AuthService {
    */
   private static readonly NATIVE_RETURN_PREFIXES = ['omlivestream://'];
 
+  /**
+   * Expo Go hands back a different scheme.
+   *
+   * A standalone build redirects to `omlivestream://…`, but inside Expo Go the
+   * app has no scheme of its own — `Linking.createURL()` produces
+   * `exp://192.168.x.x:8081/--/auth/callback`, pointing at the developer's
+   * Metro server. Rejecting that means social sign-in can never be tested on a
+   * real phone before a full native build exists, which is most of the
+   * development cycle.
+   *
+   * Allowed **only outside production**. In production these patterns are
+   * refused like any other unknown host: `exp://` carries an arbitrary IP, so
+   * permitting it on the live API would be an open redirect with extra steps.
+   */
+  private static readonly DEV_RETURN_PATTERNS = [
+    /^exp:\/\/[\w.:-]+\/--\//,        // Expo Go over LAN or tunnel
+    /^exp\+[\w-]+:\/\//,               // Expo Go, custom-scheme form
+    /^http:\/\/localhost:\d+\//,       // local web client
+  ];
+
   static isAllowedNativeReturn(url: string | undefined | null): boolean {
     if (!url) return false;
-    return AuthService.NATIVE_RETURN_PREFIXES.some((p) => url.startsWith(p));
+    if (AuthService.NATIVE_RETURN_PREFIXES.some((p) => url.startsWith(p))) return true;
+
+    if (env.NODE_ENV !== 'production') {
+      return AuthService.DEV_RETURN_PATTERNS.some((re) => re.test(url));
+    }
+    return false;
   }
 
   /**

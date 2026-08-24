@@ -35,6 +35,7 @@ export function Screen({
   title,
   subtitle,
   right,
+  aboveTitle,
   children,
   scrollable = true,
   refreshing,
@@ -45,6 +46,8 @@ export function Screen({
   title?: string;
   subtitle?: string;
   right?: React.ReactNode;
+  /** Rendered above the large title — used for the brand lockup on Home. */
+  aboveTitle?: React.ReactNode;
   children: React.ReactNode;
   scrollable?: boolean;
   refreshing?: boolean;
@@ -73,6 +76,7 @@ export function Screen({
     <View style={[{ width: '100%', maxWidth: maxContentWidth, alignSelf: 'center' }, contentStyle]}>
       {largeTitle && title && (
         <View style={{ paddingHorizontal: gutter, paddingTop: space.md, paddingBottom: space.lg }}>
+          {aboveTitle && <View style={{ marginBottom: space.lg }}>{aboveTitle}</View>}
           <Txt variant="display">{title}</Txt>
           {subtitle && (
             <Txt variant="small" muted style={{ marginTop: 6 }}>{subtitle}</Txt>

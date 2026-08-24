@@ -10,6 +10,7 @@ import { ThemeProvider, useTheme } from '@/hooks/useTheme';
 import { RootNavigator } from '@/navigation';
 import { AnimatedSplash } from '@/components/AnimatedSplash';
 import { useAuth } from '@/store/auth';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 /**
  * App root.
@@ -24,6 +25,9 @@ void SplashScreen.preventAutoHideAsync().catch(() => { /* already hidden */ });
 function Shell() {
   const { t, isDark } = useTheme();
   const hydrate = useAuth((s) => s.hydrate);
+
+  // Registers this device once someone is signed in; no-ops otherwise.
+  usePushNotifications();
   const [ready, setReady] = useState(false);
   const [splashMounted, setSplashMounted] = useState(true);
 

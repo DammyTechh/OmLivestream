@@ -9,6 +9,7 @@ import { entitlements, PLATFORM_META, UPGRADE_COPY } from '@/constants/entitleme
 import { Screen } from '@/components/Screen';
 import { Card, Txt, Badge, Button, Field } from '@/components/ui';
 import { Icon } from '@/components/Icon';
+import { PlatformIcon, type PlatformId } from '@/components/PlatformIcon';
 
 interface Connection {
   platform: string;
@@ -110,7 +111,7 @@ export default function PlatformsScreen() {
           return (
             <Card key={id} style={{ opacity: allowed ? 1 : 0.55, gap: space.md }}>
               <View style={styles.row}>
-                <View style={[styles.dot, { backgroundColor: meta.color }]} />
+                <PlatformIcon platform={id as PlatformId} size={26} />
                 <View style={{ flex: 1 }}>
                   <Txt variant="h3">{meta.label}</Txt>
                   <Txt variant="small" muted style={{ marginTop: 2 }}>

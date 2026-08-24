@@ -7,6 +7,7 @@ import { space } from '@/constants/theme';
 import { Screen } from '@/components/Screen';
 import { Card, Txt, Badge, EmptyState, Button } from '@/components/ui';
 import { Icon } from '@/components/Icon';
+import { PlatformIcon, type PlatformId } from '@/components/PlatformIcon';
 import { PLATFORM_META } from '@/constants/entitlements';
 
 interface Stream {
@@ -102,11 +103,10 @@ export default function StreamsScreen() {
                       tone={s.status === 'live' ? 'live' : s.status === 'scheduled' ? 'brand' : 'neutral'}
                       dot={s.status === 'live'}
                     />
-                    {/* Destination dots: identity at a glance without a row of logos. */}
+                    {/* Destination marks — a row of real logos reads faster than text. */}
                     <View style={{ flexDirection: 'row', gap: 4 }}>
                       {(s.platforms ?? []).slice(0, 5).map((p) => (
-                        <View key={p} style={[styles.dot,
-                          { backgroundColor: PLATFORM_META[p]?.color ?? t.textMuted }]} />
+                        <PlatformIcon key={p} platform={p as PlatformId} size={14} />
                       ))}
                     </View>
                   </View>

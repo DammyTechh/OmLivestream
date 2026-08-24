@@ -24,19 +24,92 @@ in on either, and streams, platforms, recordings and billing are the same data.
 
 | | |
 |---|---|
-| Node | **20.x** (Expo SDK 52; Node 22 breaks the bundler) |
-| Xcode | 15+ for iOS |
-| Android Studio | Ladybug+ for Android |
-| Apple Developer | Required for device testing and for screen sharing |
+| Node | **20.19.4 or newer.** 20, 22, 24 and 25 all work |
+| Expo SDK | **54** — matches the Expo Go build on the App Store / Play Store |
+| Phone | Expo Go (update it if the app refuses to open the project) |
 
-**This is not an Expo Go app.** `react-native-webrtc` ships native code, so it
-needs a dev build. That is deliberate — discovering it later means redoing setup.
+### Why the SDK version is pinned
+
+Expo Go can only run the SDK it was compiled against. If this project declares
+a newer SDK than the Expo Go on the phone, the app refuses to open it:
+
+```
+Project is incompatible with this version of Expo Go
+```
+
+That is the one error `npm install` cannot fix — it is a phone-side version
+mismatch, not a dependency problem. Either keep the project on the SDK that
+store Expo Go ships (what this repo does), or move to a development build,
+which bakes in whatever SDK you choose and stops the question from existing.
+
+### Node is no longer pinned
+
+The project used to sit on Expo SDK 52, which could not tolerate the TypeScript
+type-stripping Node introduced in 22 and turned on by default in 24 — every
+command died inside `expo-modules-core` with
+`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`. The old `.npmrc` set
+`engine-strict=true` and a `preinstall` hook rejected the install outright, so
+at least the failure named itself instead of surfacing as a bundler crash.
+
+SDK 54 handles modern Node directly, so the guard, the hook and the pin are all
+gone. `engines` is still declared, but as a warning rather than a wall.
+
+---
+
+## Running it today — Expo Go
+
+The app currently uses **only modules bundled inside Expo Go**, so it runs on a
+real iPhone and a real Android in seconds, from any machine — no Xcode, no
+Android Studio, no build queue, no Apple Developer account.
 
 ```bash
 npm install
-npx expo prebuild --clean      # generates ios/ and android/
-npx expo run:ios               # or: npx expo run:android
+npm start          # scan the QR with Expo Go (Android) or Camera (iOS)
 ```
+
+Phone and computer must be on the same wifi. If the venue's network blocks
+device-to-device traffic, `npx expo start --tunnel` routes around it.
+
+> **iOS from Windows:** `expo run:ios` will always refuse — Apple requires
+> macOS to compile. Expo Go sidesteps that entirely, which is the main reason
+> to start here.
+
+`react-native-webrtc` and `mediasoup-client` are **not installed**. They used to
+sit in `optionalDependencies`, which npm installs by default — so an unused,
+RN-0.76-era native package was being pulled into every install and blocking the
+upgrade for no benefit. Nothing imports them yet; add them in the commit that
+actually uses them.
+
+---
+
+## Later — dev builds
+
+The moment mediasoup publishing is wired in, Expo Go stops being an option:
+that package ships native code, and Expo Go can only run modules baked into it.
+
+At that point:
+
+1. `npx expo install react-native-webrtc mediasoup-client expo-dev-client`
+2. Add `'expo-dev-client'` to `plugins` in `app.config.ts`
+3. Restore the iOS block in `expo-build-properties` — webrtc needs
+   `useFrameworks: 'static'` and a raised `deploymentTarget` to link
+   (a dev build also unpins the SDK, since Expo Go is no longer involved)
+4. Build:
+
+```bash
+npm run start:dev-client
+
+# Local (macOS needed for iOS)
+npx expo prebuild --clean
+npx expo run:android          # or run:ios
+
+# Or in the cloud — works from Windows, iOS included
+npx eas build -p android --profile development
+npx eas build -p ios --profile development
+```
+
+Screen sharing additionally needs a paid Apple Developer account, since the
+ReplayKit extension cannot run in a simulator.
 
 Environment (`.env`, or your EAS secrets):
 
@@ -97,7 +170,7 @@ app stores' in-app purchase rules — a much larger conversation.
 
 | | |
 |---|---|
-| **mediasoup publishing** | `react-native-webrtc` and `mediasoup-client` are installed and the Go Live → Live flow is complete against the API. The `Device`/transport/producer wiring is the next piece. |
+| **mediasoup publishing** | The Go Live → Live flow is complete against the API. `react-native-webrtc` + `mediasoup-client` are not installed yet; the `Device`/transport/producer wiring is the next piece. |
 | **Screen sharing** | iOS needs a **ReplayKit Broadcast Upload Extension** (a Swift target, unavoidable in any framework); Android needs `MediaProjection` + a foreground service. Permissions are already declared in `app.config.ts`. |
 | **Push notifications** | Not started. |
 

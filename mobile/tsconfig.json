@@ -4,9 +4,8 @@
     "strict": true,
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] },
-    "noUncheckedIndexedAccess": false,
     "skipLibCheck": true
   },
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
   "exclude": ["node_modules"]
 }

@@ -14,6 +14,7 @@ import { Txt } from '@/components/ui';
 import { useAuth } from '@/store/auth';
 
 import SignInScreen     from '@/screens/SignInScreen';
+import OnboardingScreen from '@/screens/OnboardingScreen';
 import OverviewScreen   from '@/screens/OverviewScreen';
 import GoLiveScreen     from '@/screens/GoLiveScreen';
 import StreamsScreen    from '@/screens/StreamsScreen';
@@ -24,6 +25,7 @@ import RecordingsScreen from '@/screens/RecordingsScreen';
 
 export type RootStackParams = {
   SignIn: undefined;
+  Onboarding: undefined;
   Tabs: undefined;
   Live: { streamId: string };
   Recordings: undefined;
@@ -126,6 +128,13 @@ export function RootNavigator() {
   const { t, isDark } = useTheme();
   const user = useAuth((s) => s.user);
 
+  /**
+   * `onboarding_completed` comes from /users/me. Someone who signed up on the
+   * website has it already and goes straight in; someone who signed up here
+   * does not, and is routed through the questionnaire first.
+   */
+  const needsOnboarding = Boolean(user && user.onboarding_completed === false);
+
   const navTheme = {
     ...(isDark ? DarkTheme : DefaultTheme),
     colors: {
@@ -141,7 +150,24 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
-        {user ? (
+        {/*
+          Three states, not two.
+          
+          Signed out → SignIn. Signed in but not onboarded → Onboarding.
+          Otherwise → the app. The middle case is the one that was missing:
+          somebody who discovered OmliveStream through the app reached an empty
+          dashboard with no name and no profile, and nothing ever asked.
+          
+          Driven by auth state rather than by navigating imperatively, so
+          finishing onboarding simply refreshes the profile and the navigator
+          moves on by itself — there is no way to end up on the wrong screen
+          because a navigate() call was missed.
+        */}
+        {!user ? (
+          <Stack.Screen name="SignIn" component={SignInScreen} />
+        ) : needsOnboarding ? (
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        ) : (
           <>
             <Stack.Screen name="Tabs" component={Tabs} />
             {/* The live screen is a full-screen modal, not a tab. Going live is
@@ -162,8 +188,6 @@ export function RootNavigator() {
               options={{ presentation: 'card', animation: 'slide_from_right' }}
             />
           </>
-        ) : (
-          <Stack.Screen name="SignIn" component={SignInScreen} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
