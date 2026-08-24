@@ -44,9 +44,14 @@ const PLATFORMS = [
   { id: 'instagram', label: 'Instagram', Icon: InstagramIcon, color: '#E4405F', connect: 'key',   live: false,
     rtmp: '',
     help: 'Instagram Live Producer — requires a Professional account' },
+  // Stream key only, and that is not a temporary state. TikTok for Developers
+  // confirmed in writing (Aug 2026) that there is no public TikTok LIVE API:
+  // no programmatic way to start a broadcast, and no LIVE chat, viewer or
+  // event data. Connecting via OAuth would store a token that go-live cannot
+  // use, so the key is the real path rather than a fallback.
   { id: 'tiktok',    label: 'TikTok',    Icon: TikTokIcon,    color: '#EE1D52', connect: 'key',   live: false,
     rtmp: '',
-    help: 'TikTok LIVE Studio — requires LIVE access approval' },
+    help: 'TikTok LIVE Studio → Stream key (TikTok has no public LIVE API)' },
   { id: 'twitter',   label: 'X',         Icon: XIcon,         color: '#111111', connect: 'key',   live: false,
     rtmp: '',
     help: 'X Media Studio → Producer — requires a paid tier' },

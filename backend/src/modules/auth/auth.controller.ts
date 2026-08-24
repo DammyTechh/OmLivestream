@@ -34,8 +34,11 @@ export const verifyOtpHandler = async (req: FastifyRequest, reply: FastifyReply)
 
 // Step 1 — hand the frontend a URL to send the browser to.
 export const getSocialUrlHandler = (provider: SocialProvider) =>
-  async (_req: FastifyRequest, reply: FastifyReply) => {
-    const state   = await svc.issueOAuthState(provider);
+  async (req: FastifyRequest<{ Querystring: { redirect?: string } }>, reply: FastifyReply) => {
+    // The mobile app passes its own deep link so the browser can hand control
+    // back to it. Web clients omit it and land on the site as before. The
+    // value is allowlisted in issueOAuthState — see the note there.
+    const state   = await svc.issueOAuthState(provider, req.query?.redirect);
     const authUrl = svc.getSocialOAuthUrl(provider, state);
     // `state` is returned so the frontend can double-check the value that
     // comes back, but the authoritative check is server-side in the callback.
@@ -58,10 +61,17 @@ export const socialCallbackHandler = (provider: SocialProvider) =>
       return reply.redirect(`${signIn}?status=declined&provider=${provider}`);
     }
 
+    // Hoisted so a failure below can still send a native client home. The
+    // state is single-use and deleted on consume, so there is nothing left to
+    // look up once we are in the catch.
+    let returnTo: string | undefined;
+
     try {
       if (!code || !state) throw new AppError('Missing code or state', 400);
 
-      const { provider: stateProvider } = await svc.consumeOAuthState(state);
+      const consumed = await svc.consumeOAuthState(state);
+      const stateProvider = consumed.provider;
+      returnTo = consumed.returnTo;
       // A code issued for one provider must not be redeemable against
       // another, whose token endpoint would be called with the wrong secret.
       if (stateProvider && stateProvider !== provider) {
@@ -71,9 +81,30 @@ export const socialCallbackHandler = (provider: SocialProvider) =>
       const result = await svc.handleSocialOAuth(provider, code, req.ip, req.headers['user-agent'] ?? '');
       const ticket = await svc.parkSocialResult(result);
 
+      // A native client asked to be returned to its own scheme, so hand the
+      // ticket straight back to the app. `returnTo` has already been checked
+      // against the allowlist twice — on issue and on consume — because this
+      // line is what would otherwise be an open redirect.
+      //
+      // The ticket, not the tokens, travels in the URL either way: a URL ends
+      // up in logs and history, and a one-time ticket is worthless once spent.
+      if (returnTo) {
+        const sep = returnTo.includes('?') ? '&' : '?';
+        return reply.redirect(
+          `${returnTo}${sep}ticket=${encodeURIComponent(ticket)}&provider=${provider}`,
+        );
+      }
+
       return reply.redirect(`${signIn}?ticket=${encodeURIComponent(ticket)}&provider=${provider}`);
     } catch (err) {
       req.log.warn({ err, provider }, 'social oauth callback failed');
+      // Best-effort: if this attempt came from the app, send the failure back
+      // there too. Stranding someone on the website with no route home is a
+      // worse outcome than the failure itself.
+      if (returnTo) {
+        const sep = returnTo.includes('?') ? '&' : '?';
+        return reply.redirect(`${returnTo}${sep}error=${encodeURIComponent('Sign-in failed')}`);
+      }
       return reply.redirect(`${signIn}?status=failed&provider=${provider}`);
     }
   };

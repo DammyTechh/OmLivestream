@@ -21,8 +21,24 @@ import { sendSuccess } from '../../utils/response';
 const PROVIDERS: { id: SocialProvider; label: string }[] = [
   { id: 'google',    label: 'Google'    },
   { id: 'facebook',  label: 'Facebook'  },
-  { id: 'instagram', label: 'Instagram' },
-  // TikTok and Twitch are deliberately absent from *sign-in*.
+  // Instagram is deliberately absent from *sign-in*, for two separate reasons:
+  //
+  //  1. It cannot work. Sign-in used the Instagram Basic Display API, which
+  //     Meta shut down on 4 December 2024 — its authorize endpoint now returns
+  //     Instagram's "this page isn't available" 404, which is exactly what we
+  //     were seeing.
+  //
+  //  2. It is not permitted. Meta's own policy states Basic Display "is not an
+  //     authentication tool… if your app uses API data to authenticate users,
+  //     it will be rejected during App Review," and directs apps to use
+  //     Facebook Login instead. So migrating to the replacement API would not
+  //     make an Instagram sign-in button approvable either.
+  //
+  // Facebook Login already covers these users. Instagram remains fully
+  // available as a broadcast destination under Platforms, which uses the
+  // Instagram Graph API and is unaffected by any of this.
+  //
+  // TikTok and Twitch are also absent from sign-in.
   //
   // Neither adds a way in that Google, Facebook or an email code does not
   // already cover, and both cost something to keep: TikTok's login product

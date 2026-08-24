@@ -231,7 +231,7 @@ export class AuthService {
    * Returns the provider the flow was started for, so a code obtained under
    * one provider cannot be redeemed against another.
    */
-  async consumeOAuthState(state: string): Promise<{ provider: SocialProvider | null }> {
+  async consumeOAuthState(state: string): Promise<{ provider: SocialProvider | null; returnTo?: string }> {
     const key = REDIS_KEYS.OAUTH_STATE_V2(state);
     const raw = await redis.get<string>(key);
     if (!raw) throw new UnauthorizedError('This sign-in link has expired. Please try again.');
@@ -240,19 +240,47 @@ export class AuthService {
     // Older states were stored as the bare string "1" with no provider. Treat
     // those as valid-but-unattributed rather than rejecting mid-deploy.
     try {
-      const parsed = JSON.parse(raw) as { provider?: SocialProvider };
-      return { provider: parsed.provider ?? null };
+      const parsed = JSON.parse(raw) as { provider?: SocialProvider; returnTo?: string };
+      // Re-checked on the way out as well as in: a value that somehow reached
+      // Redis without passing the allowlist still must not be redirected to.
+      const returnTo = AuthService.isAllowedNativeReturn(parsed.returnTo)
+        ? parsed.returnTo : undefined;
+      return { provider: parsed.provider ?? null, returnTo };
     } catch {
       return { provider: null };
     }
   }
 
   /** Records a freshly-minted state so the callback can verify it. */
-  async issueOAuthState(provider: SocialProvider): Promise<string> {
+  /**
+   * Only the mobile app's own scheme may be returned to.
+   *
+   * The callback redirects the browser wherever this says, so accepting an
+   * arbitrary value would turn sign-in into an open redirect — an attacker
+   * could send someone through a legitimate Google consent screen and have the
+   * resulting ticket delivered to a host they control. An allowlist of exact
+   * prefixes is the only safe form of this feature.
+   */
+  private static readonly NATIVE_RETURN_PREFIXES = ['omlivestream://'];
+
+  static isAllowedNativeReturn(url: string | undefined | null): boolean {
+    if (!url) return false;
+    return AuthService.NATIVE_RETURN_PREFIXES.some((p) => url.startsWith(p));
+  }
+
+  /**
+   * `returnTo` is stored with the state rather than passed through the
+   * provider, because the provider's redirect_uri is registered in their
+   * console and cannot vary per request. The state is already a server-side
+   * record of this attempt, so it is the natural place to remember where the
+   * attempt came from.
+   */
+  async issueOAuthState(provider: SocialProvider, returnTo?: string): Promise<string> {
     const state = generateToken(16);
+    const safeReturn = AuthService.isAllowedNativeReturn(returnTo) ? returnTo : undefined;
     await redis.set(
       REDIS_KEYS.OAUTH_STATE_V2(state),
-      JSON.stringify({ provider, at: Date.now() }),
+      JSON.stringify({ provider, at: Date.now(), returnTo: safeReturn }),
       { ex: OAUTH_STATE_TTL_SECONDS },
     );
     return state;

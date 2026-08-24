@@ -1,0 +1,115 @@
+# Lives in .github/workflows/ because that is the only path GitHub reads.
+#
+# This file previously sat at backend/ci-cd.yml, where it was never executed —
+# so every push went out with no type check, no lint and no build gate. It is
+# unchanged apart from this move and the notes below.
+name: OmliveStream CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Type-check & lint backend ──────────────────────────────────
+  backend-check:
+    name: Backend — Type Check & Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run type-check
+
+      # `npm run lint` is eslint --fix, which mutates files. In CI there is
+      # nothing to commit the fixes to, and auto-fixing can mask a real
+      # failure, so check without writing.
+      - name: Lint
+        run: npx eslint src --ext .ts --max-warnings=0
+
+  # ── Type-check frontend ────────────────────────────────────────
+  frontend-check:
+    name: Frontend — Type Check & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build (catches all Next.js errors)
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://placeholder.vercel.app/api/v1
+          NEXT_PUBLIC_SOCKET_URL: https://placeholder.vercel.app
+
+  # ── Deploy backend to Vercel (main branch only) ──────────────
+  deploy-backend:
+    name: Deploy Backend → Vercel
+    needs: [backend-check]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
+          working-directory: backend
+          vercel-args: '--prod'
+
+  # ── Deploy frontend to Vercel (main branch only) ─────────────
+  deploy-frontend:
+    name: Deploy Frontend → Vercel
+    needs: [frontend-check]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
+          working-directory: frontend
+          vercel-args: '--prod'
+
+# ── Required GitHub Secrets ──────────────────────────────────────
+# Add these in: GitHub repo → Settings → Secrets → Actions
+#
+# VERCEL_TOKEN              → Vercel → Account Settings → Tokens
+# VERCEL_ORG_ID             → Vercel → Account Settings → General (Team ID or personal ID)
+# VERCEL_BACKEND_PROJECT_ID → Vercel → Backend project → Settings → General
+# VERCEL_FRONTEND_PROJECT_ID→ Vercel → Frontend project → Settings → General

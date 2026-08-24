@@ -90,10 +90,39 @@ export function getStreamProducers(streamId: string): {
   };
 }
 
+/**
+ * Ceiling on what a creator's browser may send us, in bits per second.
+ *
+ * 5 Mbps: enough for 1080p30 at the bitrate YouTube and Twitch publish as
+ * their recommendation, with room for the burst after a keyframe. Raising it
+ * further mostly buys larger bursts rather than visibly better video, and
+ * costs bandwidth on every concurrent stream.
+ */
+const MAX_INCOMING_BITRATE = 5_000_000;
+
 // ── Worker pool ────────────────────────────────────────────────────
 
 export async function initWorkers(): Promise<void> {
-  const count = Math.min(os.cpus().length, 4);
+  /**
+   * One worker per core, by mediasoup's own guidance.
+   *
+   * A mediasoup worker is a single-threaded C++ process, so a worker count
+   * below the core count leaves cores idle no matter how many creators are
+   * live. This used to be capped at 4, which was fine on a small box and
+   * quietly wasted more than half of a bigger one — precisely the machine you
+   * move to when streaming quality starts to matter.
+   *
+   * Routers are handed out round-robin (see nextWorker), so raising the count
+   * spreads live streams across more cores rather than piling them onto four.
+   *
+   * MEDIASOUP_NUM_WORKERS overrides it when the box is shared with other work
+   * and you want to reserve headroom. Clamped to at least 1 so a bad value
+   * cannot leave the pool empty, which would fail every go-live.
+   */
+  const configured = Number(process.env.MEDIASOUP_NUM_WORKERS);
+  const count = Number.isFinite(configured) && configured > 0
+    ? Math.floor(configured)
+    : Math.max(1, os.cpus().length);
   for (let i = 0; i < count; i++) {
     const worker = await mediasoup.createWorker({
       rtcMinPort:   env.MEDIASOUP_MIN_PORT,
@@ -174,11 +203,36 @@ export async function createWebRtcTransport(streamId: string): Promise<Transport
     enableTcp:  true,  // fallback for restrictive networks
     preferUdp:  true,  // UDP = lower latency
     enableSctp: false,
-    // Large initial/max bitrates to prevent throttling during burst
+    // Headroom for the outgoing direction so bandwidth estimation does not
+    // start conservatively and ramp.
     initialAvailableOutgoingBitrate: 1_000_000,
-    
-    maxSctpMessageSize: 262144,
   });
+
+  /**
+   * Raise the ceiling on what the browser is allowed to send us.
+   *
+   * This is the setting that decides broadcast quality. The transport here is
+   * effectively send-only — the creator's browser produces, the server
+   * consumes — and `initialAvailableOutgoingBitrate` only governs the
+   * *outgoing* direction, so it was doing nothing for the video that actually
+   * reaches YouTube or Twitch. Incoming bitrate is governed by
+   * setMaxIncomingBitrate, which was never called.
+   *
+   * Left uncalled, mediasoup's default keeps the sender well below what a
+   * decent connection can carry, and the creator sees a soft, low-detail
+   * 720p even on fibre. 5 Mbps comfortably covers 1080p30 and matches what
+   * YouTube and Twitch recommend for that resolution, while still leaving the
+   * browser's own congestion control free to back off on a weak network —
+   * this raises the ceiling, it does not force the rate.
+   *
+   * Non-fatal on failure: an unsupported transport should degrade to the
+   * previous behaviour, not stop someone going live.
+   */
+  try {
+    await transport.setMaxIncomingBitrate(MAX_INCOMING_BITRATE);
+  } catch (err) {
+    logger.warn({ err, streamId }, 'Could not raise max incoming bitrate — using mediasoup default');
+  }
 
   // Auto-close on inactivity
   transport.on('dtlsstatechange', (state) => {

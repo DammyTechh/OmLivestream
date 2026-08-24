@@ -1,0 +1,106 @@
+/* MultiCam styling.
+ *
+ * Follows the system appearance rather than shipping a theme switcher. This
+ * runs alongside a projector feed and a lighting desk; matching whatever the
+ * operator's OS is already set to is less jarring than imposing a look, and it
+ * is one less control on a screen that has plenty.
+ *
+ * The palette is the OmliveStream one, so MultiCam reads as part of the
+ * product rather than a separate tool that happens to talk to it.
+ */
+:root {
+  --brand: #6D28D9;
+  --brand-soft: rgba(109, 40, 217, 0.14);
+  --live: #E5484D;
+  --ok: #10B981;
+
+  --bg: #0A0818;
+  --surface: #141024;
+  --surface-2: #1B1630;
+  --border: rgba(255, 255, 255, 0.10);
+  --text: #F8F5FF;
+  --muted: #8B84A3;
+
+  color-scheme: dark light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #F6F4FA;
+    --surface: #FFFFFF;
+    --surface-2: #FAF9FD;
+    --border: rgba(20, 16, 36, 0.10);
+    --text: #141024;
+    --muted: #605A75;
+  }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /* Nothing here should be selectable by accident — this is an instrument,
+     not a document. Inputs opt back in below. */
+  user-select: none;
+  overflow: hidden;
+}
+
+input, textarea, select { user-select: text; font-family: inherit; }
+
+button {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 9px 14px;
+  cursor: pointer;
+  background: var(--surface-2);
+  color: var(--text);
+  transition: opacity .12s, background .12s;
+}
+button:hover:not(:disabled) { opacity: .85; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button.primary { background: var(--brand); color: #fff; }
+button.danger  { background: var(--live);  color: #fff; }
+button.ghost   { background: transparent; border-color: var(--border); color: var(--muted); }
+button.active  { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+
+input, select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 13px;
+  width: 100%;
+}
+input:focus, select:focus { outline: none; border-color: var(--brand); }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: var(--muted);
+}
+
+.row { display: flex; align-items: center; gap: 10px; }
+.col { display: flex; flex-direction: column; gap: 10px; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
