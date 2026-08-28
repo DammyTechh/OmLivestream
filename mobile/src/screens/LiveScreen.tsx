@@ -17,6 +17,7 @@ import { entitlements, PLATFORM_META, UPGRADE_COPY } from '@/constants/entitleme
 import { Txt, Badge, Button } from '@/components/ui';
 import { Icon } from '@/components/Icon';
 import { FeedbackSheet } from '@/components/FeedbackSheet';
+import { startPublishing, isPublishingAvailable, PUBLISHING_UNAVAILABLE_MESSAGE, type PublishHandle } from '@/lib/publisher';
 import type { RootStackParams } from '@/navigation';
 
 interface Metric { platform: string; viewers?: number; comments?: number }
@@ -62,12 +63,21 @@ export default function LiveScreen() {
   const [panel, setPanel] = useState<'stats' | 'comments'>('stats');
 
   const startedAt = useRef<number>(Date.now());
+  /** The live publishing session. Null until the pipeline is up. */
+  const publisher = useRef<PublishHandle | null>(null);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Keep the screen awake for the duration ────────────────────────
   useEffect(() => {
     void activateKeepAwakeAsync('live-broadcast');
-    return () => { void deactivateKeepAwake('live-broadcast'); };
+    return () => {
+      void deactivateKeepAwake('live-broadcast');
+      // Belt and braces: if this screen goes away by any route that did not
+      // run endStream, the camera and producers still stop.
+      void publisher.current?.stop().catch(() => {});
+      publisher.current = null;
+    };
   }, []);
 
   // ── Start the broadcast ───────────────────────────────────────────
@@ -75,7 +85,25 @@ export default function LiveScreen() {
     let cancelled = false;
     (async () => {
       try {
+        // The server prepares the router and the RTMP fan-out first; there is
+        // nothing to publish into until this returns.
         await api.post(`/streams/${streamId}/start`);
+        if (cancelled) return;
+
+        if (isPublishingAvailable()) {
+          publisher.current = await startPublishing({
+            streamId,
+            facing: facing === 'front' ? 'front' : 'environment',
+            audio: true,
+            onFailed: (reason) => setPublishError(reason),
+          });
+        } else {
+          // Expo Go. The broadcast exists server-side and the UI is honest
+          // about why no video is leaving the device, rather than showing a
+          // live badge over nothing.
+          setPublishError(PUBLISHING_UNAVAILABLE_MESSAGE);
+        }
+
         if (!cancelled) {
           setStatus('live');
           startedAt.current = Date.now();
@@ -146,6 +174,10 @@ export default function LiveScreen() {
 
   const endStream = async (reason: 'ended' | 'cancelled') => {
     setStatus('ending');
+    // Stop sending before telling the server to end, so the last frames are
+    // flushed rather than cut mid-packet.
+    try { await publisher.current?.stop(); } catch { /* already gone */ }
+    publisher.current = null;
     try {
       await api.post(`/streams/${streamId}/end`);
     } catch (err) {
@@ -171,6 +203,9 @@ export default function LiveScreen() {
   const flip = () => {
     if (!ent.cameraSwitching) { Alert.alert('Premium feature', UPGRADE_COPY.cameraSwitching); return; }
     setFacing((f) => (f === 'front' ? 'back' : 'front'));
+    // Swaps the capture device behind the same track, so the broadcast does
+    // not freeze while a new producer is negotiated.
+    void publisher.current?.flipCamera();
   };
 
   const mmss = (s: number) => {
@@ -196,7 +231,10 @@ export default function LiveScreen() {
             ? <ActivityIndicator size="small" color="#FFF" />
             : <View style={[styles.liveDot, { backgroundColor: t.live }]} />}
           <Txt variant="caption" color="#FFFFFF">
-            {status === 'starting' ? 'STARTING' : status === 'ending' ? 'ENDING' : 'LIVE'}
+            {status === 'starting' ? 'STARTING'
+              : status === 'ending' ? 'ENDING'
+              : publishError ? 'NO SIGNAL'
+              : 'LIVE'}
           </Txt>
           {status === 'live' && (
             <Txt variant="caption" color="rgba(255,255,255,0.75)">{mmss(elapsed)}</Txt>
@@ -216,6 +254,21 @@ export default function LiveScreen() {
           <Icon name="close" size={18} color="#FFFFFF" />
         </Pressable>
       </View>
+
+      {/* Honest state.
+      
+          A "LIVE" badge over a broadcast that is sending nothing is the worst
+          thing this screen could do — a creator would talk to an empty room
+          and only find out afterwards. When the pipeline is not up, it says
+          so, plainly, over the preview. */}
+      {publishError && (
+        <View style={[styles.warnBanner, { backgroundColor: 'rgba(229,72,77,0.94)' }]}>
+          <Icon name="alert" size={15} color="#FFFFFF" />
+          <Txt variant="small" color="#FFFFFF" style={{ flex: 1, lineHeight: 18 }}>
+            {publishError}
+          </Txt>
+        </View>
+      )}
 
       {/* ── Bottom sheet: stats / comments ────────────────────────── */}
       <View style={[styles.sheet, { paddingBottom: insets.bottom + space.md }]}>
@@ -278,7 +331,14 @@ export default function LiveScreen() {
         {/* Controls */}
         <View style={styles.controls}>
           <Pressable
-            onPress={() => setMicOn((v) => !v)}
+            onPress={() => {
+              const next = !micOn;
+              setMicOn(next);
+              // Toggling the track keeps the producer alive — muting by
+              // closing it would drop audio from every platform and need a
+              // renegotiation to restore.
+              publisher.current?.setMicEnabled(next);
+            }}
             style={[styles.ctrlBtn, !micOn && { backgroundColor: t.live }]}
           >
             <Icon name={micOn ? 'mic' : 'micOff'} size={20} color="#FFFFFF" />
@@ -323,6 +383,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   liveDot: { width: 7, height: 7, borderRadius: 4 },
+  warnBanner: {
+    position: 'absolute', left: space.lg, right: space.lg, top: '38%',
+    flexDirection: 'row', alignItems: 'center', gap: space.sm,
+    paddingHorizontal: space.lg, paddingVertical: space.md,
+    borderRadius: radius.md,
+  },
   closeBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',

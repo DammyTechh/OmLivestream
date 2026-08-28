@@ -8,3 +8,10 @@ android/
 .env
 .env.local
 .DS_Store
+
+# Play Store service account — can publish releases to your listing.
+play-service-account.json
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist

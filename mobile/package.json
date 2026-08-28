@@ -62,5 +62,9 @@
   },
   "engines": {
     "node": ">=20.19.4"
+  },
+  "optionalDependencies": {
+    "react-native-webrtc": "^124.0.5",
+    "mediasoup-client": "^3.7.16"
   }
 }

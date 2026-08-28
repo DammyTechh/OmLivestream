@@ -47,6 +47,21 @@ const config: ExpoConfig = {
   },
 
   android: {
+    /**
+     * The identifier Google Play and the Android Developer Console key on.
+     *
+     * It is permanent: once an app is published under it, it can never be
+     * changed or reused, so this is the string to register. The `.dev` variant
+     * is a *separate* app so a debug build can sit on the same phone as the
+     * real one — register both if you want internal builds installable on
+     * certified devices, or drop the variant and register only the production
+     * name.
+     *
+     * `versionCode` is deliberately absent: eas.json sets
+     * `appVersionSource: "remote"`, so EAS increments it. Declaring it in both
+     * places gives two sources of truth and a rejected upload the first time
+     * they disagree.
+     */
     package: IS_DEV ? 'com.omlivestream.app.dev' : 'com.omlivestream.app',
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',

@@ -12,6 +12,25 @@ import { Mixer, LAYOUTS, DEFAULT_CONFIG, type Source, type LayoutId, type MixerC
  * the "stop" to be somewhere their hand already knows.
  */
 
+/**
+ * Ingest endpoints, so an operator only ever pastes a stream key.
+ *
+ * These URLs are stable and public, and asking a volunteer to find
+ * "rtmp://a.rtmp.youtube.com/live2" on a Sunday morning is how a service goes
+ * out to nobody. Custom is kept for anything not listed — including an
+ * OmliveStream relay.
+ */
+const PRESETS: { id: string; label: string; url: string }[] = [
+  { id: 'youtube',   label: 'YouTube',   url: 'rtmp://a.rtmp.youtube.com/live2' },
+  { id: 'facebook',  label: 'Facebook',  url: 'rtmps://live-api-s.facebook.com:443/rtmp' },
+  { id: 'twitch',    label: 'Twitch',    url: 'rtmp://live.twitch.tv/app' },
+  { id: 'kick',      label: 'Kick',      url: 'rtmp://ingest.kick.com/live' },
+  { id: 'tiktok',    label: 'TikTok',    url: 'rtmp://push.tiktokcdn.com/live' },
+  { id: 'custom',    label: 'Custom',    url: '' },
+];
+
+interface Destination { id: string; label: string; rtmp_url: string; stream_key: string; enabled: boolean }
+
 const RESOLUTIONS = [
   { label: '1080p', width: 1920, height: 1080, bitrate: 4500 },
   { label: '720p',  width: 1280, height: 720,  bitrate: 2500 },
@@ -32,8 +51,9 @@ export default function App() {
   const [fps, setFps] = useState(0);
   const [ffmpegOk, setFfmpegOk] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [rtmpUrl, setRtmpUrl] = useState('rtmp://a.rtmp.youtube.com/live2');
-  const [streamKey, setStreamKey] = useState('');
+  const [destinations, setDestinations] = useState<Destination[]>([
+    { id: 'd1', label: 'YouTube', rtmp_url: PRESETS[0].url, stream_key: '', enabled: true },
+  ]);
   const [res, setRes] = useState(RESOLUTIONS[0]);
 
   // ── Boot ──────────────────────────────────────────────────────────
@@ -166,16 +186,34 @@ export default function App() {
   // ── Broadcast ─────────────────────────────────────────────────────
   const pumpRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /** Destinations that are switched on and actually have a key. */
+  const ready = destinations.filter((d) => d.enabled && d.stream_key.trim() && d.rtmp_url.trim());
+
+  const addDestination = () =>
+    setDestinations((d) => [
+      ...d,
+      { id: `d${Date.now()}`, label: 'YouTube', rtmp_url: PRESETS[0].url, stream_key: '', enabled: true },
+    ]);
+
+  const updateDestination = (id: string, patch: Partial<Destination>) =>
+    setDestinations((ds) => ds.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+
+  const removeDestination = (id: string) =>
+    setDestinations((ds) => (ds.length === 1 ? ds : ds.filter((d) => d.id !== id)));
+
   const goLive = async () => {
     const m = mixerRef.current;
-    if (!m || !streamKey.trim()) return;
+    if (!m || ready.length === 0) return;
     setError(null);
     try {
       m.setConfig({ width: res.width, height: res.height });
       await invoke('start_broadcast', {
         config: {
-          rtmp_url: rtmpUrl.trim(),
-          stream_key: streamKey.trim(),
+          destinations: ready.map((d) => ({
+            label: d.label,
+            rtmp_url: d.rtmp_url.trim(),
+            stream_key: d.stream_key.trim(),
+          })),
           width: res.width,
           height: res.height,
           fps: cfg.fps,
@@ -213,14 +251,20 @@ export default function App() {
 
       {/* ── Sources ──────────────────────────────────────────────── */}
       <aside style={{ background: 'var(--bg)', padding: 16, overflowY: 'auto' }} className="col">
-        <div className="row" style={{ gap: 8, marginBottom: 4 }}>
-          <div style={{ width: 22, height: 22, borderRadius: 11, background: 'var(--brand)',
-                        display: 'grid', placeItems: 'center' }}>
-            <div style={{ width: 0, height: 0, marginLeft: 2,
-                          borderLeft: '7px solid #fff', borderTop: '5px solid transparent',
-                          borderBottom: '5px solid transparent' }} />
+        {/* The real lockup. MultiCam is an OmliveStream product and should
+            look like one — a drawn approximation of the mark is the kind of
+            detail that makes a companion tool feel third-party. */}
+        <div className="row" style={{ gap: 9, marginBottom: 6 }}>
+          <img src="/logo-mark.png" alt="" width={26} height={26} style={{ display: 'block' }} />
+          <div style={{ lineHeight: 1.15 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em' }}>
+              Omlive<span style={{ color: 'var(--brand)' }}>Stream</span>
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--muted)', letterSpacing: '.09em',
+                          textTransform: 'uppercase', fontWeight: 600 }}>
+              MultiCam
+            </div>
           </div>
-          <strong style={{ fontSize: 14 }}>MultiCam</strong>
         </div>
 
         <div className="label">Sources</div>
@@ -325,16 +369,71 @@ export default function App() {
         <div className="label">Broadcast</div>
 
         <div className="col" style={{ gap: 8 }}>
-          <div>
-            <div className="label" style={{ marginBottom: 5 }}>RTMP server</div>
-            <input value={rtmpUrl} onChange={(e) => setRtmpUrl(e.target.value)}
-                   disabled={live} spellCheck={false} />
-          </div>
-          <div>
-            <div className="label" style={{ marginBottom: 5 }}>Stream key</div>
-            <input type="password" value={streamKey} placeholder="Paste your stream key"
-                   onChange={(e) => setStreamKey(e.target.value)} disabled={live} spellCheck={false} />
-          </div>
+          {destinations.map((d) => (
+            <div key={d.id} className="card" style={{ padding: 12, opacity: d.enabled ? 1 : 0.55 }}>
+              <div className="spread" style={{ marginBottom: 8 }}>
+                <select
+                  value={PRESETS.find((p) => p.url === d.rtmp_url)?.id ?? 'custom'}
+                  disabled={live}
+                  onChange={(e) => {
+                    const preset = PRESETS.find((p) => p.id === e.target.value)!;
+                    updateDestination(d.id, {
+                      label: preset.label,
+                      rtmp_url: preset.id === 'custom' ? '' : preset.url,
+                    });
+                  }}
+                  style={{ width: 'auto', flex: 1 }}
+                >
+                  {PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+
+                <button
+                  className="ghost"
+                  disabled={live}
+                  onClick={() => updateDestination(d.id, { enabled: !d.enabled })}
+                  style={{ padding: '5px 10px', fontSize: 11 }}
+                  title={d.enabled ? 'Skip this destination' : 'Include this destination'}
+                >
+                  {d.enabled ? 'On' : 'Off'}
+                </button>
+
+                {destinations.length > 1 && (
+                  <button className="ghost" disabled={live}
+                          onClick={() => removeDestination(d.id)}
+                          style={{ padding: '5px 9px', fontSize: 11 }}>
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Only shown for Custom — a preset URL is not something anyone
+                  should be able to mistype into a failed broadcast. */}
+              {!PRESETS.some((p) => p.url === d.rtmp_url && p.id !== 'custom') && (
+                <input
+                  value={d.rtmp_url}
+                  disabled={live}
+                  placeholder="rtmp://…"
+                  spellCheck={false}
+                  onChange={(e) => updateDestination(d.id, { rtmp_url: e.target.value })}
+                  style={{ marginBottom: 8 }}
+                />
+              )}
+
+              <input
+                type="password"
+                value={d.stream_key}
+                disabled={live}
+                placeholder="Stream key"
+                spellCheck={false}
+                onChange={(e) => updateDestination(d.id, { stream_key: e.target.value })}
+              />
+            </div>
+          ))}
+
+          <button className="ghost" disabled={live} onClick={addDestination}>
+            + Add destination
+          </button>
+
           <div>
             <div className="label" style={{ marginBottom: 5 }}>Quality</div>
             <select value={res.label} disabled={live}
@@ -348,7 +447,7 @@ export default function App() {
 
         {live
           ? <button className="danger" onClick={stopLive}>Stop broadcast</button>
-          : <button className="primary" disabled={!streamKey.trim() || !ffmpegOk} onClick={goLive}>
+          : <button className="primary" disabled={ready.length === 0 || !ffmpegOk} onClick={goLive}>
               Go live
             </button>}
 

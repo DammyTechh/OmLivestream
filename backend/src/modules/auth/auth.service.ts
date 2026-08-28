@@ -287,7 +287,8 @@ export class AuthService {
     if (!url) return false;
     if (AuthService.NATIVE_RETURN_PREFIXES.some((p) => url.startsWith(p))) return true;
 
-    if (env.NODE_ENV !== 'production') {
+    // Outside production, or when explicitly switched on for device testing.
+    if (env.NODE_ENV !== 'production' || env.ALLOW_DEV_OAUTH_RETURN) {
       return AuthService.DEV_RETURN_PATTERNS.some((re) => re.test(url));
     }
     return false;

@@ -30,6 +30,26 @@ const envSchema = z.object({
   SUPPORT_EMAIL: z.string().email().default('support@omlivestream.com'),
   SALES_EMAIL:   z.string().email().default('sales@omlivestream.com'),
 
+  /**
+   * Lets Expo Go complete social sign-in against this server.
+   *
+   * Expo Go has no custom scheme, so the app's OAuth return URL is
+   * `exp://<your-lan-ip>:8081/--/auth/callback`. That is refused in production
+   * on purpose — it carries an arbitrary host, so accepting it unconditionally
+   * would be an open redirect.
+   *
+   * Set this to `true` only while testing on a real phone, and turn it off
+   * again afterwards. It is a separate switch rather than something inferred
+   * so that enabling it is always a decision somebody made on purpose.
+   */
+  // NOT z.coerce.boolean(): coercion follows JavaScript truthiness, so the
+  // string "false" — the most natural way to switch this off in a .env file —
+  // becomes `true`. A flag that cannot be turned off is worse than no flag,
+  // and on a security control it is dangerous. Match the literal instead.
+  ALLOW_DEV_OAUTH_RETURN: z.string().optional()
+    .transform((v) => v?.toLowerCase() === 'true')
+    .pipe(z.boolean()),
+
   SUPABASE_URL: z.string().url(),
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),

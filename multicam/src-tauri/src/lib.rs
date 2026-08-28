@@ -32,10 +32,18 @@ pub struct MediaDevice {
     pub kind: String, // "video" | "audio"
 }
 
-#[derive(Debug, Deserialize)]
-pub struct OutputConfig {
+#[derive(Debug, Deserialize, Clone)]
+pub struct Destination {
+    /// Human name, for error messages: "Twitch", "Church YouTube".
+    pub label: String,
     pub rtmp_url: String,
     pub stream_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OutputConfig {
+    /// Every platform this broadcast goes to, at once.
+    pub destinations: Vec<Destination>,
     pub width: u32,
     pub height: u32,
     pub fps: u32,
@@ -121,11 +129,38 @@ fn start_broadcast(
         return Err("A broadcast is already running.".into());
     }
 
-    let target = format!(
-        "{}/{}",
-        config.rtmp_url.trim_end_matches('/'),
-        config.stream_key.trim()
-    );
+    if config.destinations.is_empty() {
+        return Err("Add at least one destination before going live.".into());
+    }
+
+    /*
+     * One encoder, many destinations — via ffmpeg's `tee` muxer.
+     *
+     * The naive approach is one ffmpeg per platform, which encodes the same
+     * frames three or four times over and will saturate the CPU of the laptop
+     * running the projector. Encoding once and fanning the finished packets
+     * out costs barely more than a single stream.
+     *
+     * `onfail=ignore` is the part that matters in a live room: without it, one
+     * bad stream key takes down every other destination too. With it, a dead
+     * platform simply drops out and the rest carry on — nobody in the
+     * congregation notices.
+     *
+     * This mirrors what the OmliveStream server does for phone broadcasts, so
+     * a stream mixed here behaves the same way as one sent from the app.
+     */
+    let tee_targets = config
+        .destinations
+        .iter()
+        .map(|d| {
+            format!(
+                "[f=flv:onfail=ignore]{}/{}",
+                d.rtmp_url.trim_end_matches('/'),
+                d.stream_key.trim()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("|");
 
     let child = Command::new(ffmpeg_path(&app))
         .args([
@@ -156,8 +191,12 @@ fn start_broadcast(
             "-ar", "44100",
             "-ac", "2",
             "-shortest",
-            "-f", "flv",
-            &target,
+            "-f", "tee",
+            // Both streams must be mapped explicitly for tee; without this it
+            // silently publishes video only.
+            "-map", "0:v",
+            "-map", "1:a",
+            &tee_targets,
         ])
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
