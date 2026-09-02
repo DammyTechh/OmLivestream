@@ -1,0 +1,18 @@
+# Shell scripts must keep LF endings.
+#
+# Git for Windows defaults to core.autocrlf=true, which rewrites LF to CRLF on
+# checkout. A shell script with CRLF fails on Linux with errors like
+#
+#     /root/01-provision.sh: line 2: $'\r': command not found
+#
+# which reads like a broken script rather than a line-ending problem, and has
+# cost people hours. `text eol=lf` pins these regardless of the local setting.
+*.sh text eol=lf
+
+# Same reasoning for anything else the server executes or parses.
+Dockerfile  text eol=lf
+*.service   text eol=lf
+*.conf      text eol=lf
+
+# Let Git decide for everything else.
+* text=auto

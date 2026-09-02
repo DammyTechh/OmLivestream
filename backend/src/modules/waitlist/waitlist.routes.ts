@@ -19,7 +19,35 @@ export async function waitlistRoutes(fastify: FastifyInstance): Promise<void> {
    * Called from the landing page / getform webhook or directly.
    * Also callable from the app for logged-out visitors.
    */
+  /**
+   * The waitlist is closed.
+   *
+   * OmliveStream is live, so there is nothing to wait for — anyone can sign up
+   * and stream immediately. This answers 410 Gone rather than being deleted,
+   * so a cached landing page or an old link gets an explanation instead of a
+   * confusing 404, and any client still posting here fails loudly rather than
+   * appearing to succeed.
+   *
+   * Everything below stays untouched, and that is deliberate: people who
+   * joined before launch hold reward codes we promised to honour. `/status`
+   * and the redemption path in billing are what make good on that. Removing
+   * them would withdraw the offer from exactly the people who backed the
+   * product earliest.
+   */
   fastify.post('/join', {
+    config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
+    schema: { tags: ['Waitlist'], summary: 'Closed — OmliveStream is live' },
+  }, async (_req, reply) => {
+    return reply.code(410).send({
+      success: false,
+      error: {
+        code: 'WAITLIST_CLOSED',
+        message: 'The waitlist has closed — OmliveStream is live. Create an account and start streaming now.',
+      },
+    });
+  });
+
+  fastify.post('/join-legacy', {
     config: { rateLimit: { max: 5, timeWindow: '1 hour' } }, // stricter rate limit
     schema: {
       tags: ['Waitlist'],

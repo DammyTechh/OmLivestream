@@ -86,10 +86,10 @@ export function AboutContent() {
           </motion.p>
           <motion.div {...reveal} transition={{ delay: 0.18 }} className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Link
-              href="/waitlist"
+              href="/auth/signup"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-white font-semibold hover:bg-primary/90 transition shadow-lg shadow-primary/25"
             >
-              Join the Waitlist <ArrowRight size={18} />
+              Start streaming <ArrowRight size={18} />
             </Link>
             <Link
               href="/#features"
@@ -239,17 +239,17 @@ export function AboutContent() {
               </div>
               <div className="rounded-2xl bg-surface/70 border border-border p-7">
                 <Users size={22} className="text-primary mb-4" />
-                <h3 className="font-display text-xl font-semibold mb-2">Join the waitlist</h3>
+                <h3 className="font-display text-xl font-semibold mb-2">Start streaming today</h3>
                 <p className="text-sm text-muted leading-relaxed mb-5">
-                  Register now and get a <span className="text-text font-medium">1-month free premium
-                  subscription</span> at launch, exclusive discounts on your first 3 months, and early
-                  access to new features before the public release.
+                  OmliveStream is live. Create an account, connect your platforms, and
+                  broadcast to all of them at once — <span className="text-text font-medium">free
+                  to start</span>, with no card required.
                 </p>
                 <Link
-                  href="/waitlist"
+                  href="/auth/signup"
                   className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-white font-semibold hover:bg-primary/90 transition shadow-lg shadow-primary/25"
                 >
-                  Reserve Your Spot <ArrowRight size={18} />
+                  Create your account <ArrowRight size={18} />
                 </Link>
               </div>
             </div>

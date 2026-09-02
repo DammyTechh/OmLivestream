@@ -257,16 +257,15 @@ export async function createWebRtcTransport(streamId: string): Promise<Transport
     /**
      * The router's capabilities, returned alongside the transport.
      *
-     * mediasoup-client cannot do anything until `device.load()` has been given
-     * these — it needs to know which codecs the server speaks before it can
-     * negotiate a producer. Without it there is no client-side path at all,
-     * which is why native publishing could not be built against this endpoint
-     * before.
+     * mediasoup-client can do nothing until `device.load()` has been given
+     * these — it must know which codecs the server speaks before it can
+     * negotiate a producer. Without them there is no client-side path at all,
+     * which is why native publishing could not be built against this endpoint.
      *
      * Sent here rather than from a separate route to keep it to one round
-     * trip: a creator tapping "go live" should not wait on two sequential
-     * requests before the camera even starts negotiating. Adding a field is
-     * backward compatible — the web client ignores what it does not read.
+     * trip: tapping "go live" should not wait on two sequential requests
+     * before the camera starts negotiating. Adding a field is backward
+     * compatible — the web client ignores what it does not read.
      */
     routerRtpCapabilities: router.rtpCapabilities,
   };

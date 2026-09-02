@@ -125,10 +125,12 @@ export function Hero() {
                   >
                     Start Streaming
                   </button>
+                  {/* The waitlist closed at launch. This slot now does the more useful
+                      job of catching people who already have an account. */}
                   <p className="text-xs text-center text-muted">
-                    Not ready to stream yet?{' '}
-                    <Link href="/waitlist" className="text-primary hover:underline font-medium">
-                      Join the waitlist
+                    Already have an account?{' '}
+                    <Link href="/auth/signin" className="text-primary hover:underline font-medium">
+                      Sign in
                     </Link>
                   </p>
                 </form>

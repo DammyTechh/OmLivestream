@@ -24,7 +24,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const routes: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
     { path: '',          priority: 1.0, changeFrequency: 'weekly'  },
     { path: '/about',    priority: 0.8, changeFrequency: 'monthly' },
-    { path: '/waitlist', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/privacy',  priority: 0.3, changeFrequency: 'yearly'  },
     // Linked from the Meta app settings and the privacy policy; needs to be
     // crawlable and stable, since app review checks that it resolves.

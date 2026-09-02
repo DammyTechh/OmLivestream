@@ -140,7 +140,31 @@ export async function complete(opts: CompletionOptions): Promise<string> {
       lastErr = err;
 
       if (isQuotaError(err)) {
-        logger.error({ feature: opts.feature }, 'OpenAI quota exhausted');
+        /**
+         * Log enough to tell *which* account is out of credit.
+         *
+         * "quota exhausted" alone is unactionable when a key has just been
+         * funded. The usual causes are that the deployed backend still holds
+         * an older key, or that credit was added to a different OpenAI project
+         * than the one this key belongs to — project-scoped keys (`sk-proj-…`)
+         * draw on that project's budget, not the organisation balance, and a
+         * zero project budget produces exactly this error on a funded account.
+         *
+         * The key itself is never logged, only its prefix and last four:
+         * enough to compare against the console without putting a credential
+         * into a log aggregator.
+         */
+        const k = env.OPENAI_API_KEY ?? '';
+        logger.error(
+          {
+            feature: opts.feature,
+            keyKind: k.startsWith('sk-proj-') ? 'project-scoped' : k.startsWith('sk-') ? 'user/org' : 'unknown',
+            keyHint: k ? `${k.slice(0, 11)}…${k.slice(-4)}` : 'MISSING',
+            openaiMessage: (lastErr as OpenAIErrorish)?.message,
+          },
+          'OpenAI quota exhausted — verify this exact key is the funded one, and ' +
+          'for sk-proj keys that the project itself has a budget',
+        );
         throw new AppError(QUOTA_MESSAGE, 503, 'AI_QUOTA_EXHAUSTED');
       }
       if (!isRetryable(err) || attempt === MAX_ATTEMPTS) break;
