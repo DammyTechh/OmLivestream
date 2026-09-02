@@ -36,8 +36,19 @@ command -v node    >/dev/null || die "node missing — run 01-provision.sh first
 command -v ffmpeg  >/dev/null || die "ffmpeg missing — run 01-provision.sh first."
 command -v nginx   >/dev/null || die "nginx missing — run 01-provision.sh first."
 redis-cli ping >/dev/null 2>&1 || die "redis not responding — run 01-provision.sh first."
-ffmpeg -hide_banner -encoders 2>/dev/null | grep -q ' libx264' \
-  || die "ffmpeg has no libx264. The broadcast pipeline cannot encode without it."
+# NOT `ffmpeg ... | grep -q`.
+#
+# `grep -q` exits at the first match and closes the pipe; ffmpeg then dies of
+# SIGPIPE (141), and with `set -o pipefail` the pipeline reports that failure
+# even though the match succeeded. The check would fail on a server that has
+# libx264 — which is exactly what happened.
+#
+# Capturing first, then testing the string, has no pipe to break.
+FFMPEG_ENCODERS=$(ffmpeg -hide_banner -encoders 2>/dev/null || true)
+case $FFMPEG_ENCODERS in
+  *libx264*) : ;;
+  *) die "ffmpeg has no libx264. Install it with: apt-get install -y libavcodec-extra" ;;
+esac
 echo "  node $(node --version), ffmpeg $(ffmpeg -version | head -1 | awk '{print $3}'), redis up"
 
 # ── 1. Service user ─────────────────────────────────────────────────────────

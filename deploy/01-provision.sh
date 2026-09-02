@@ -100,7 +100,13 @@ ok "nginx $(nginx -v 2>&1 | awk -F/ '{print $2}')"
 # libx264 is the software encoder used only when a browser sends VP8 instead
 # of H.264 (broadcast.service.ts:328-340). Without it that path dies rather
 # than degrading, so confirm it is actually compiled in.
-if ffmpeg -hide_banner -encoders 2>/dev/null | grep -q ' libx264'; then
+# Captured, not piped into `grep -q`.
+#
+# `grep -q` exits at the first match and closes the pipe, so ffmpeg dies of
+# SIGPIPE (141). With `set -o pipefail` that makes the pipeline report failure
+# even when the match succeeded — a false MISSING on a server that has libx264.
+FFMPEG_ENC=$(ffmpeg -hide_banner -encoders 2>/dev/null || true)
+if [[ $FFMPEG_ENC == *libx264* ]]; then
   ok "libx264 present (VP8 fallback path will work)"
 else
   warn "libx264 MISSING — a browser sending VP8 cannot be transcoded"
@@ -269,7 +275,7 @@ PUBLIC_IPV4   : ${PUBLIC_IP}
 node          : $(node --version)
 npm           : $(npm --version)
 ffmpeg        : $(ffmpeg -version | head -1 | awk '{print $3}')
-libx264       : $(ffmpeg -hide_banner -encoders 2>/dev/null | grep -q ' libx264' && echo yes || echo MISSING)
+libx264       : $(FE=$(ffmpeg -hide_banner -encoders 2>/dev/null || true); [[ $FE == *libx264* ]] && echo yes || echo MISSING)
 nginx         : $(nginx -v 2>&1 | awk -F/ '{print $2}')
 redis         : $(redis-cli ping 2>/dev/null || echo DOWN) / policy=$(redis-cli config get maxmemory-policy 2>/dev/null | tail -1)
 
