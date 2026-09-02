@@ -99,10 +99,21 @@ esac
 
 if [[ ! -d $APP_ROOT/.git ]]; then
   git -c init.defaultBranch="$BRANCH" init -q "$APP_ROOT"
-  git -C "$APP_ROOT" remote add origin "$REPO_URL"
   echo "  initialised in place (kept existing directories)"
 fi
-git -C "$APP_ROOT" remote set-url origin "$REPO_URL"
+
+# Deliberately outside the block above.
+#
+# A run that created .git and then failed before wiring the remote — which is
+# exactly what a mid-script error produces — would otherwise be unrecoverable:
+# .git exists, so the branch is skipped, and every later git call fails with
+# "No such remote 'origin'". Setting it every time makes any partial state
+# self-healing, which is the whole promise of a re-runnable script.
+if git -C "$APP_ROOT" remote get-url origin >/dev/null 2>&1; then
+  git -C "$APP_ROOT" remote set-url origin "$REPO_URL"
+else
+  git -C "$APP_ROOT" remote add origin "$REPO_URL"
+fi
 git -C "$APP_ROOT" fetch --depth 1 origin "$BRANCH"
 git -C "$APP_ROOT" checkout -f -B "$BRANCH" "origin/$BRANCH"
 echo "  at $(git -C "$APP_ROOT" rev-parse --short HEAD)"
