@@ -233,14 +233,21 @@ export class AuthService {
    */
   async consumeOAuthState(state: string): Promise<{ provider: SocialProvider | null; returnTo?: string }> {
     const key = REDIS_KEYS.OAUTH_STATE_V2(state);
-    const raw = await redis.get<string>(key);
+    const raw = await redis.get<unknown>(key);
     if (!raw) throw new UnauthorizedError('This sign-in link has expired. Please try again.');
     await redis.del(key);
 
     // Older states were stored as the bare string "1" with no provider. Treat
     // those as valid-but-unattributed rather than rejecting mid-deploy.
+    //
+    // The shape also depends on the Redis transport: Upstash's REST client
+    // parses JSON on read, a TCP client returns the raw string. Handling both
+    // matters here even though the catch below hides a failure — silently
+    // returning provider:null loses `returnTo`, which is what sends the mobile
+    // app back to itself after sign-in.
     try {
-      const parsed = JSON.parse(raw) as { provider?: SocialProvider; returnTo?: string };
+      const parsed = (typeof raw === 'string' ? JSON.parse(raw) : raw) as
+        { provider?: SocialProvider; returnTo?: string };
       // Re-checked on the way out as well as in: a value that somehow reached
       // Redis without passing the allowlist still must not be redirected to.
       const returnTo = AuthService.isAllowedNativeReturn(parsed.returnTo)
@@ -499,10 +506,31 @@ export class AuthService {
   /** Redeems a ticket exactly once. */
   async redeemSocialTicket(ticket: string): Promise<SocialSignInResult> {
     const key = `oauth:ticket:${ticket}`;
-    const raw = await redis.get<string>(key);
+    const raw = await redis.get<unknown>(key);
     if (!raw) throw new UnauthorizedError('This sign-in has expired. Please try again.');
     await redis.del(key);
-    return JSON.parse(raw) as SocialSignInResult;
+
+    /**
+     * Upstash's REST client parses JSON on read; a TCP client does not.
+     *
+     * `parkSocialResult` stores this with JSON.stringify, so what comes back is
+     * a string on one transport and an already-parsed object on the other.
+     * Calling JSON.parse on the object stringifies it to "[object Object]" and
+     * throws SyntaxError — which surfaced as a generic 500 at the last step of
+     * every social sign-in, after the user had already approved at Google.
+     *
+     * Accepting both shapes makes this independent of which client is
+     * configured, rather than working only on the transport it was written
+     * against.
+     */
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw) as SocialSignInResult;
+      } catch {
+        throw new UnauthorizedError('This sign-in could not be completed. Please try again.');
+      }
+    }
+    return raw as SocialSignInResult;
   }
 
   // ══════════════════════════════════════════════════════════════

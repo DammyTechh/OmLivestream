@@ -64,6 +64,15 @@ fi
 
 # ── 2. Code ─────────────────────────────────────────────────────────────────
 step "Fetching code"
+# Never sit at an interactive credential prompt.
+#
+# The repo is public, so a fetch should be anonymous. If git ever asks for a
+# username here it means the URL is wrong or a stale credential is being sent —
+# and a prompt inside a deploy script just hangs, or worse, stores a bad
+# credential that makes every later run fail the same way. Failing immediately
+# with the real error is far easier to fix.
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=/bin/true
 #
 # `git init` + `fetch` + `checkout`, not `git clone`.
 #

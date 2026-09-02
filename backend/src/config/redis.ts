@@ -305,10 +305,27 @@ export function createRateLimitRedis(): any {
   const client = new IORedis(env.UPSTASH_REDIS_URL, {
     maxRetriesPerRequest: 1,
     enableReadyCheck:     false,
+    // `enableOfflineQueue: false` means "fail fast rather than queue during an
+    // outage", which is right for a rate limiter — a limiter that blocks is
+    // worse than one that lets a request through.
+    //
+    // But it was paired with `lazyConnect: true`, and together they are broken:
+    // lazy means no connection is opened until the first command, and that
+    // first command then hits a socket that is still handshaking and throws
+    //
+    //     Stream isn't writeable and enableOfflineQueue options is false
+    //
+    // On a TLS endpoint the handshake takes long enough that this fires on
+    // essentially every cold start, so the first requests after every deploy
+    // returned 500 instead of being rate-limited.
+    //
+    // Connecting eagerly fixes it: by the time a request arrives the socket is
+    // ready, and any genuine failure is caught by the error handler below,
+    // where the plugin degrades to per-instance counters as intended.
     enableOfflineQueue:   false,
     ...tlsFor(env.UPSTASH_REDIS_URL),
     connectTimeout:       3000,
-    lazyConnect:          true,
+    lazyConnect:          false,
   });
   // Warn, don't crash: the plugin degrades to its in-process store by itself.
   client.on('error', (err: Error) =>
