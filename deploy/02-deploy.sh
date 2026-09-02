@@ -295,6 +295,23 @@ echo "  api and worker running"
 
 # ── 6. nginx ────────────────────────────────────────────────────────────────
 step "nginx"
+#
+# Written ONCE, then left alone.
+#
+# certbot edits this file when it issues a certificate — it adds the whole
+# `listen 443 ssl` server block and the port-80 redirect. Rewriting the file on
+# every deploy threw that away, so a redeploy silently removed HTTPS and left
+# nothing listening on 443: the site went from working to ERR_CONNECTION_REFUSED
+# with no error anywhere in the deploy output.
+#
+# Regenerating it is only safe before certbot has touched it. After that, the
+# file belongs to certbot and this script must not own it. If the proxy config
+# genuinely needs to change later, edit it by hand and re-run
+# `certbot --nginx` afterwards.
+if [[ -f /etc/nginx/sites-available/omlivestream ]] \
+   && grep -q "listen 443" /etc/nginx/sites-available/omlivestream 2>/dev/null; then
+  echo "  existing config has TLS — leaving it untouched"
+else
 cat > /etc/nginx/sites-available/omlivestream <<EOF
 server {
     listen 80;
@@ -324,6 +341,7 @@ server {
     }
 }
 EOF
+fi
 ln -sf /etc/nginx/sites-available/omlivestream /etc/nginx/sites-enabled/omlivestream
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
@@ -350,8 +368,27 @@ step "Verifying"
 sleep 2
 LOCAL=$(curl -fsS -m 5 http://127.0.0.1:3001/health 2>/dev/null || echo FAILED)
 echo "  local  : $LOCAL"
-PUBLIC=$(curl -fsS -m 8 "https://${API_DOMAIN}/api/v1/health" 2>/dev/null || echo "not reachable yet")
-echo "  public : $PUBLIC"
+PUBLIC=$(curl -fsS -m 8 "https://${API_DOMAIN}/api/v1/health" 2>/dev/null || echo "")
+if [[ -n $PUBLIC ]]; then
+  echo "  public : $PUBLIC"
+else
+  # Loud, not a passing note.
+  #
+  # This printed "not reachable yet" and then a success banner, which reads as
+  # normal when it is in fact the site being down. A deploy that ends with the
+  # public endpoint unreachable is a failed deploy, and it should say so.
+  echo ""
+  warn "PUBLIC ENDPOINT IS NOT ANSWERING — https://${API_DOMAIN} is DOWN"
+  echo ""
+  echo "  Most likely: nginx has no TLS block. Check with"
+  echo "      ss -lntp | grep -E ':(80|443)'"
+  echo "  If nothing is on 443, restore it with"
+  echo "      certbot --nginx -d ${API_DOMAIN} --non-interactive --agree-tos --redirect \\"
+  echo "              -m ${CERTBOT_EMAIL:-support@omlivestream.com}"
+  echo ""
+  echo "  Local API is $( [[ $LOCAL == FAILED ]] && echo DOWN too || echo "fine — this is an nginx/TLS problem, not the app")."
+  echo ""
+fi
 
 cat <<DONE
 
