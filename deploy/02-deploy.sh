@@ -64,15 +64,29 @@ fi
 
 # ── 2. Code ─────────────────────────────────────────────────────────────────
 step "Fetching code"
-if [[ -d $APP_ROOT/.git ]]; then
-  git -C "$APP_ROOT" fetch --depth 1 origin "$BRANCH"
-  git -C "$APP_ROOT" reset --hard "origin/$BRANCH"
-  echo "  updated to $(git -C "$APP_ROOT" rev-parse --short HEAD)"
-else
-  mkdir -p "$APP_ROOT"
-  git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$APP_ROOT"
-  echo "  cloned $(git -C "$APP_ROOT" rev-parse --short HEAD)"
+#
+# `git init` + `fetch` + `checkout`, not `git clone`.
+#
+# Stage 1 creates $APP_ROOT along with recordings/ and app/ subdirectories, and
+# `git clone` refuses any destination that is not empty. Cloning elsewhere and
+# moving would work but would either clobber those directories or leave them
+# orphaned — and recordings/ is 0700 for a reason.
+#
+# This form is indifferent to the starting state: empty directory, directory
+# with files already in it, or an existing checkout being updated. `checkout -f`
+# overwrites tracked files and leaves untracked ones (recordings) alone, which
+# is exactly the behaviour wanted for a redeploy.
+mkdir -p "$APP_ROOT"
+if [[ ! -d $APP_ROOT/.git ]]; then
+  git -c init.defaultBranch="$BRANCH" init -q "$APP_ROOT"
+  git -C "$APP_ROOT" remote add origin "$REPO_URL"
+  echo "  initialised in place (kept existing directories)"
 fi
+git -C "$APP_ROOT" remote set-url origin "$REPO_URL"
+git -C "$APP_ROOT" fetch --depth 1 origin "$BRANCH"
+git -C "$APP_ROOT" checkout -f -B "$BRANCH" "origin/$BRANCH"
+echo "  at $(git -C "$APP_ROOT" rev-parse --short HEAD)"
+
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$APP_ROOT"
 
 # ── 3. Environment ──────────────────────────────────────────────────────────
