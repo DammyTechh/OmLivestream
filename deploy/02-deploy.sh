@@ -77,6 +77,26 @@ step "Fetching code"
 # overwrites tracked files and leaves untracked ones (recordings) alone, which
 # is exactly the behaviour wanted for a redeploy.
 mkdir -p "$APP_ROOT"
+
+# Git refuses to operate on a repository owned by another user.
+#
+# $APP_ROOT belongs to the service account (stage 1 created it that way, and it
+# must stay that way so the running service can read it), but this script runs
+# as root. Git calls that "dubious ownership" and stops — a protection against
+# a hostile repo planted by another user on a shared machine, which is not the
+# situation here.
+#
+# Declaring it safe is the sanctioned fix. Chowning the tree to root instead
+# would work today and break the service tomorrow.
+#
+# Captured rather than `| grep -q`: grep exits on first match and the SIGPIPE
+# would trip `pipefail`, exactly as it did in the libx264 check.
+SAFE_DIRS=$(git config --global --get-all safe.directory 2>/dev/null || true)
+case $SAFE_DIRS in
+  *"$APP_ROOT"*) : ;;
+  *) git config --global --add safe.directory "$APP_ROOT" ;;
+esac
+
 if [[ ! -d $APP_ROOT/.git ]]; then
   git -c init.defaultBranch="$BRANCH" init -q "$APP_ROOT"
   git -C "$APP_ROOT" remote add origin "$REPO_URL"
