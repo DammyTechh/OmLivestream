@@ -26,6 +26,14 @@ export interface PublishHandle {
   stream: MediaStream;
 }
 
+interface TransportParams {
+  id: string;
+  iceParameters: unknown;
+  iceCandidates: unknown;
+  dtlsParameters: unknown;
+  routerRtpCapabilities?: unknown;
+}
+
 export interface PublishOptions {
   streamId: string;
   /** An existing camera stream to publish. If absent, one is opened. */
@@ -56,21 +64,37 @@ export async function startPublishing(opts: PublishOptions): Promise<PublishHand
   const mediasoupClient = await import('mediasoup-client');
 
   // ── 1. Transport + router capabilities ───────────────────────────
-  const params = await api
-    .post('/webrtc/create-transport', { streamId })
-    .then(unwrap<{
-      id: string;
-      iceParameters: unknown;
-      iceCandidates: unknown;
-      dtlsParameters: unknown;
-      routerRtpCapabilities?: unknown;
-    }>);
+  /**
+   * Read the transport params out of whatever shape comes back.
+   *
+   * The API wraps responses as `{ success, data }` and `unwrap()` reaches into
+   * `res.data.data` — but relying on that exact nesting made this fail with
+   * "server did not return connection details" on a response that was a
+   * perfectly good 200. Rather than guess which layer holds the payload, find
+   * the object that actually carries the fields mediasoup needs.
+   *
+   * This is deliberately tolerant: getting a broadcast on air matters more
+   * than insisting on one envelope shape.
+   */
+  const res = await api.post('/webrtc/create-transport', { streamId });
 
-  // `params` itself can be undefined when the response envelope differs from
-  // what unwrap() expects — an error body, or an older server. Reading a field
-  // off it then throws "undefined is not an object", which names an internal
-  // variable and tells the creator nothing. Check the object before the field.
-  if (!params || typeof params !== 'object') {
+  const findTransport = (v: unknown, depth = 0): TransportParams | null => {
+    if (!v || typeof v !== 'object' || depth > 4) return null;
+    const o = v as Record<string, unknown>;
+    if (o.id && o.iceParameters && o.dtlsParameters) return o as unknown as TransportParams;
+    for (const key of ['data', 'result', 'payload']) {
+      const found = findTransport(o[key], depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const params = findTransport(res);
+
+  if (!params) {
+    // Log the actual body once, so a mismatch is diagnosable from the console
+    // instead of guessing. Only on failure, and only in the browser.
+    console.error('[publisher] unexpected create-transport response:', res?.data);
     throw new Error(
       'The server did not return connection details for this stream. ' +
       'It may need updating, or the stream may have already ended.',
@@ -78,10 +102,9 @@ export async function startPublishing(opts: PublishOptions): Promise<PublishHand
   }
 
   if (!params.routerRtpCapabilities) {
-    // A server predating this field cannot be published to. Saying so plainly
-    // beats an opaque failure deep inside mediasoup's negotiation.
     throw new Error(
-      'This server does not support browser publishing yet. The backend needs updating.',
+      'This server does not support browser publishing yet. The backend needs updating ' +
+      '— /webrtc/create-transport must return routerRtpCapabilities.',
     );
   }
 
