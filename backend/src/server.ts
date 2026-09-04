@@ -19,11 +19,26 @@ async function main(): Promise<void> {
   // Build Fastify app
   const app = await buildApp();
 
-  // Wrap in raw http.Server so Socket.io can share it
-  const httpServer = http.createServer(app.server);
-
-  // Attach Socket.io
-  initSocketIO(httpServer);
+  /**
+   * Attach Socket.io to the server Fastify actually listens on.
+   *
+   * This previously did `http.createServer(app.server)`, which creates a
+   * *second* HTTP server and passes Fastify's server object as its request
+   * listener. Socket.io attached to that second server — which nothing ever
+   * calls `.listen()` on, because `app.listen()` binds Fastify's own
+   * `app.server`.
+   *
+   * So Socket.io logged "ready" and worked internally, while every real
+   * request to /socket.io/ reached Fastify instead and returned 404. Live
+   * comments and viewer counts could never arrive, and the browser retried the
+   * upgrade in a loop.
+   *
+   * `app.server` is the Node server Fastify binds, so attaching here puts
+   * Socket.io on the socket that actually receives traffic. It must happen
+   * before listen(), so the upgrade handler is registered before the first
+   * client connects.
+   */
+  initSocketIO(app.server);
   logger.info('Socket.io ready');
 
   // Spin up mediasoup Workers (one per CPU core, max 4)
