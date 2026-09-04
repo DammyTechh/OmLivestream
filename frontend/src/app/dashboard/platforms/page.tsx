@@ -83,7 +83,7 @@ function PlatformsContent() {
   const fetchConns = useCallback(async () => {
     try {
       const res = await api.get('/platforms');
-      setConns(res.data?.data || []);
+      setConns(Array.isArray(res.data?.data) ? res.data.data : []);
     } catch (err) {
       toast.error(getApiError(err, 'Could not load your connections'));
     } finally { setLoading(false); }

@@ -23,7 +23,9 @@ export default function RecordingsPage() {
     (async () => {
       try {
         const res = await api.get('/recordings?limit=50');
-        setRecordings(res.data?.data || []);
+        // Shape-checked: a 200 with an unexpected body would otherwise reach
+        // .map() and blank the page.
+        setRecordings(Array.isArray(res.data?.data) ? res.data.data : []);
       } finally { setLoading(false); }
     })();
   }, []);

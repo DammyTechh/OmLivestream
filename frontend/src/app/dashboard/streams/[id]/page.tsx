@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLiveStreamGuard } from '@/hooks/useLiveStreamGuard';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Radio, Square, Users, MessageSquare, Send, Maximize2, Minimize2 } from 'lucide-react';
+import { ArrowLeft, Radio, Square, Users, MessageSquare, Send, Maximize2, Minimize2, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Socket } from 'socket.io-client';
 import { acquireSocket, releaseSocket } from '@/lib/socket';
@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api, unwrap, getApiError } from '@/lib/api';
+import { startPublishing, publishingUnsupportedReason, type PublishHandle } from '@/lib/publisher';
 import { formatNumber } from '@/lib/utils';
 import { useAuth } from '@/store/auth';
 import { entitlements, UPGRADE_COPY } from '@/lib/entitlements';
@@ -84,6 +85,11 @@ export default function StreamDetailPage() {
   // it are noise.
   const liveRef = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  /** The live publishing session. Null until video is actually flowing. */
+  const publisherRef = useRef<PublishHandle | null>(null);
+  const previewRef = useRef<HTMLVideoElement | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [feedbackFor, setFeedbackFor] = useState<'ended' | 'cancelled' | null>(null);
   const [replyFor, setReplyFor] = useState<Comment | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -151,13 +157,48 @@ export default function StreamDetailPage() {
   }
 
   async function startStream() {
+    // Checked before anything else: on iOS Safari a page served over plain
+    // http reports "not supported" rather than a permissions error, which is
+    // what made that failure so hard to read.
+    const unsupported = publishingUnsupportedReason();
+    if (unsupported) { toast.error(unsupported); setPublishError(unsupported); return; }
+
     setActioning(true);
+    setPublishError(null);
     try {
+      // The server prepares the router and the RTMP fan-out first — there is
+      // nothing to publish into until this returns.
       await api.post(`/streams/${id}/start`);
-      toast.success('Stream started — you are LIVE');
+
+      // Then actually send video. Without this the stream is marked live and
+      // every platform sits on "Pending" waiting for input that never comes,
+      // which is exactly what was happening before.
+      const handle = await startPublishing({
+        streamId: id as string,
+        onFailed: (reason) => setPublishError(reason),
+      });
+      publisherRef.current = handle;
+      setPublishing(true);
+
+      if (previewRef.current) {
+        previewRef.current.srcObject = handle.stream;
+        // Muted: unmuted would put the room's own audio through the speakers
+        // and feed straight back into the microphone.
+        previewRef.current.muted = true;
+        await previewRef.current.play().catch(() => {});
+      }
+
+      toast.success('You are LIVE — sending video');
       await fetchStream();
     } catch (err) {
-      toast.error(getApiError(err, 'Could not start stream'));
+      const msg = getApiError(err, 'Could not start streaming');
+      setPublishError(msg);
+      toast.error(msg);
+      // The stream is marked live server-side but nothing is being sent. End
+      // it rather than leaving a broadcast that shows live and carries
+      // nothing.
+      await api.post(`/streams/${id}/end`).catch(() => {});
+      await fetchStream();
     } finally { setActioning(false); }
   }
 
@@ -166,6 +207,10 @@ export default function StreamDetailPage() {
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
+
+  // Belt and braces: if this page goes away by any route that did not run
+  // endStream, the camera and producers still stop.
+  useEffect(() => () => { void publisherRef.current?.stop().catch(() => {}); }, []);
 
   const toggleFullscreen = async () => {
     try {
@@ -180,6 +225,12 @@ export default function StreamDetailPage() {
     if (!confirm('End this stream? The recording will start processing.')) return;
     setActioning(true);
     try {
+      // Stop sending before telling the server to end, so the last frames are
+      // flushed rather than cut mid-packet.
+      await publisherRef.current?.stop().catch(() => {});
+      publisherRef.current = null;
+      setPublishing(false);
+
       await api.post(`/streams/${id}/end`);
       toast.success('Stream ended — recording is processing');
       if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
@@ -251,6 +302,40 @@ export default function StreamDetailPage() {
           ref={liveRef}
           className={fullscreen ? 'bg-bg p-6 sm:p-10 overflow-y-auto h-full' : undefined}
         >
+          {/* Your own picture, and the truth about whether it is going out.
+          
+              A LIVE badge over a broadcast that is sending nothing is the worst
+              thing this page can do — a creator talks to an empty room and only
+              finds out afterwards. The banner below says plainly when video is
+              not leaving the browser. */}
+          {publishError ? (
+            <div className="mb-4 rounded-2xl border border-danger/40 bg-danger/10 p-4 flex items-start gap-3">
+              <AlertTriangle size={18} className="text-danger mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="font-medium text-sm">Not sending video</div>
+                <p className="text-sm text-muted mt-1 leading-relaxed">{publishError}</p>
+                <p className="text-xs text-muted mt-2">
+                  Your platforms will stay on &ldquo;Pending&rdquo; until this is fixed.
+                </p>
+              </div>
+            </div>
+          ) : publishing ? (
+            <div className="mb-4 rounded-2xl border border-border bg-surface overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
+                <span className="w-2 h-2 rounded-full bg-danger animate-pulse" />
+                <span className="text-sm font-medium">Sending video</span>
+                <span className="text-xs text-muted ml-auto">Your camera, as viewers see it</span>
+              </div>
+              <video
+                ref={previewRef}
+                playsInline
+                autoPlay
+                muted
+                className="w-full aspect-video bg-black object-cover"
+              />
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-between gap-4 mb-3">
             <h2 className={`font-display font-semibold ${fullscreen ? 'text-3xl' : 'text-xl'}`}>
               Live stats by platform

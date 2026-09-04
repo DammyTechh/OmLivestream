@@ -108,10 +108,29 @@ export function StreamFeedbackModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="feedback-title"
-            className="fixed z-[111] left-1/2 -translate-x-1/2 bottom-0 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2
-                       w-full sm:w-[min(92vw,460px)] max-h-[90vh] overflow-y-auto
-                       rounded-t-2xl sm:rounded-2xl bg-surface border border-border shadow-2xl p-6"
+            /*
+             * Centred with flexbox on a full-screen wrapper, not with
+             * `left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2`.
+             *
+             * The transform approach breaks in two ways here: it fights the
+             * entry animation, which also writes to `transform`, and combined
+             * with `max-h` it clips instead of scrolling on a short viewport —
+             * so the Send button ends up below the fold with no way to reach
+             * it. A flex wrapper has neither problem and needs no breakpoint
+             * juggling.
+             *
+             * `pb-[env(safe-area-inset-bottom)]` keeps the buttons clear of the
+             * iPhone home indicator, which otherwise overlaps them.
+             */
+            className="fixed inset-0 z-[111] flex items-end sm:items-center justify-center
+                       p-0 sm:p-4 pointer-events-none"
           >
+            <div
+              className="pointer-events-auto relative w-full sm:w-[min(92vw,460px)]
+                         max-h-[92dvh] overflow-y-auto overscroll-contain
+                         rounded-t-2xl sm:rounded-2xl bg-surface border border-border shadow-2xl
+                         p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+            >
             <button
               onClick={onClose}
               aria-label="Close"
@@ -205,6 +224,7 @@ export function StreamFeedbackModal({
               >
                 {saving ? 'Sending…' : 'Send feedback'}
               </button>
+            </div>
             </div>
           </motion.div>
         </>

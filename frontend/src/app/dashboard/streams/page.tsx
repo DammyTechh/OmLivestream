@@ -24,7 +24,7 @@ export default function StreamsPage() {
       try {
         const url = filter === 'all' ? '/streams?limit=50' : `/streams?status=${filter}&limit=50`;
         const res = await api.get(url);
-        setStreams(res.data?.data || []);
+        setStreams(Array.isArray(res.data?.data) ? res.data.data : []);
       } catch {
         setStreams([]);
       } finally { setLoading(false); }

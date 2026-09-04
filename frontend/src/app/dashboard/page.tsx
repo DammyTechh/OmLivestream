@@ -52,7 +52,14 @@ export default function DashboardHomePage() {
           api.get('/users/onboarding/status').then(r => r.data?.data as OnboardingStatus).catch(() => null),
         ]);
         setOverview(o);
-        setRecent(s as Stream[]);
+        // Array.isArray, not a cast.
+        //
+        // The .catch above covers a failed request, but a 200 carrying an
+        // unexpected shape — an error envelope, a paginated object — still
+        // reaches .map() and throws, which renders as a blank white dashboard
+        // with nothing in the console to explain it. Checking the shape costs
+        // nothing and turns that into an empty list.
+        setRecent(Array.isArray(s) ? (s as Stream[]) : []);
         setOnboarding(onb);
       } finally {
         setLoading(false);

@@ -84,7 +84,7 @@ export default function AIStudioPage() {
       const data = unwrap<{ titles: string[] }>(
         await api.post('/ai/generate-title', { topic: titlePrompt, platforms }),
       );
-      setTitles(data.titles || []);
+      setTitles(Array.isArray(data?.titles) ? data.titles : []);
       if (!data.titles?.length) toast.error('No titles came back — try describing the stream differently');
     } catch (err) {
       const msg = getApiError(err, 'Could not generate titles');
