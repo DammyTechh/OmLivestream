@@ -188,6 +188,32 @@ export default function StreamDetailPage() {
         await previewRef.current.play().catch(() => {});
       }
 
+      /**
+       * Only now can the RTMP push start.
+       *
+       * `beginBroadcast` on the server refuses with NO_VIDEO_PRODUCER unless a
+       * video producer already exists — it builds consumers off the live
+       * producers to feed ffmpeg. So the order is fixed and cannot be
+       * rearranged: /start creates the router, the browser produces into it,
+       * and only then does /broadcast spawn ffmpeg and open the RTMP
+       * connections.
+       *
+       * This call was missing entirely, which is why every platform sat on
+       * "Pending" forever: video reached the server, but nothing was ever
+       * pushed onward to Facebook or anywhere else.
+       */
+      try {
+        await api.post(`/streams/${id}/broadcast`);
+      } catch (err) {
+        // The broadcast is publishing but not reaching platforms. Say so
+        // rather than letting it look fully live.
+        const msg = getApiError(err, 'Could not start pushing to your platforms');
+        setPublishError(msg);
+        toast.error(msg);
+        await fetchStream();
+        return;
+      }
+
       toast.success('You are LIVE — sending video');
       await fetchStream();
     } catch (err) {

@@ -1,3 +1,11 @@
+/**
+ * Loads @fastify/compress's type augmentation so `compress: false` is a known
+ * route option. app.ts registers the plugin with require() so a missing
+ * dependency degrades gracefully rather than refusing to boot — but a runtime
+ * require does not bring its types along, and without this line TypeScript
+ * rejects an option the running server honours perfectly well.
+ */
+import type {} from '@fastify/compress';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { authenticate } from '../../middleware/auth';
@@ -43,6 +51,28 @@ export async function webrtcRoutes(fastify: FastifyInstance): Promise<void> {
    * Call once for the send direction before producing tracks.
    */
   fastify.post('/create-transport', {
+    /**
+     * Compression is off for this route, deliberately.
+     *
+     * With @fastify/compress active, this endpoint returned
+     *
+     *     HTTP/1.1 200 OK
+     *     content-type: application/json
+     *     content-encoding: gzip
+     *     content-length: 0
+     *
+     * — a success with a gzip header and no body at all. Captured from Node
+     * directly on 127.0.0.1:3001, so nginx was not involved. The browser saw a
+     * 200, found nothing to parse, and every attempt to go live failed with
+     * "the server did not return connection details".
+     *
+     * These are one-time negotiation payloads sent once per broadcast, so
+     * compressing them saves nothing worth having. Opting the route out is a
+     * smaller change than altering the global policy that the analytics and
+     * dashboard responses rely on.
+     */
+    compress: false,
+
     schema: {
       tags: ['WebRTC'],
       summary: 'Create WebRTC send transport',
@@ -65,6 +95,8 @@ export async function webrtcRoutes(fastify: FastifyInstance): Promise<void> {
    * Call after device.load() and createSendTransport() on the frontend.
    */
   fastify.post('/connect-transport', {
+    compress: false,   // same negotiation path — see /create-transport above
+
     schema: {
       tags: ['WebRTC'],
       summary: 'Connect WebRTC transport (DTLS handshake)',
@@ -90,6 +122,28 @@ export async function webrtcRoutes(fastify: FastifyInstance): Promise<void> {
    * Returns producerId — store this and send to /streams/:id/start payload.
    */
   fastify.post('/produce', {
+    /**
+     * Compression is off for this route, deliberately.
+     *
+     * With @fastify/compress active, this endpoint returned
+     *
+     *     HTTP/1.1 200 OK
+     *     content-type: application/json
+     *     content-encoding: gzip
+     *     content-length: 0
+     *
+     * — a success with a gzip header and no body at all. Captured from Node
+     * directly on 127.0.0.1:3001, so nginx was not involved. The browser saw a
+     * 200, found nothing to parse, and every attempt to go live failed with
+     * "the server did not return connection details".
+     *
+     * These are one-time negotiation payloads sent once per broadcast, so
+     * compressing them saves nothing worth having. Opting the route out is a
+     * smaller change than altering the global policy that the analytics and
+     * dashboard responses rely on.
+     */
+    compress: false,
+
     schema: {
       tags: ['WebRTC'],
       summary: 'Start producing a media track (video or audio)',

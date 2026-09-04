@@ -94,7 +94,18 @@ export async function startPublishing(opts: PublishOptions): Promise<PublishHand
   if (!params) {
     // Log the actual body once, so a mismatch is diagnosable from the console
     // instead of guessing. Only on failure, and only in the browser.
-    console.error('[publisher] unexpected create-transport response:', res?.data);
+    // Log everything needed to identify the shape without another round trip.
+    // The previous version logged only `res.data`, which printed nothing when
+    // the body was empty — true but unhelpful.
+    console.error('[publisher] create-transport did not yield transport params', {
+      status: (res as { status?: number })?.status,
+      hasData: Boolean((res as { data?: unknown })?.data),
+      dataType: typeof (res as { data?: unknown })?.data,
+      dataKeys: (res as { data?: object })?.data && typeof (res as { data?: object }).data === 'object'
+        ? Object.keys((res as { data: object }).data)
+        : null,
+      bodyPreview: JSON.stringify((res as { data?: unknown })?.data ?? null).slice(0, 400),
+    });
     throw new Error(
       'The server did not return connection details for this stream. ' +
       'It may need updating, or the stream may have already ended.',
