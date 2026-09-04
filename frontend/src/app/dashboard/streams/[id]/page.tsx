@@ -89,6 +89,7 @@ export default function StreamDetailPage() {
   const publisherRef = useRef<PublishHandle | null>(null);
   const previewRef = useRef<HTMLVideoElement | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [feedbackFor, setFeedbackFor] = useState<'ended' | 'cancelled' | null>(null);
   const [replyFor, setReplyFor] = useState<Comment | null>(null);
@@ -178,15 +179,11 @@ export default function StreamDetailPage() {
         onFailed: (reason) => setPublishError(reason),
       });
       publisherRef.current = handle;
+      // Held in state so the effect below can attach it once the <video>
+      // element exists. Assigning here cannot work: setPublishing only
+      // schedules a render, so previewRef is still null on this tick.
+      setLocalStream(handle.stream);
       setPublishing(true);
-
-      if (previewRef.current) {
-        previewRef.current.srcObject = handle.stream;
-        // Muted: unmuted would put the room's own audio through the speakers
-        // and feed straight back into the microphone.
-        previewRef.current.muted = true;
-        await previewRef.current.play().catch(() => {});
-      }
 
       /**
        * Only now can the RTMP push start.
@@ -238,6 +235,30 @@ export default function StreamDetailPage() {
   // endStream, the camera and producers still stop.
   useEffect(() => () => { void publisherRef.current?.stop().catch(() => {}); }, []);
 
+  /**
+   * Attach the camera to the preview once the element actually exists.
+   *
+   * This used to run immediately after `setPublishing(true)`, which cannot
+   * work: setState only schedules a render, so on that tick the <video> has
+   * not been created and `previewRef.current` is still null. The assignment
+   * was silently skipped and the panel stayed black — while the stream itself
+   * was publishing perfectly well, which made it look far more broken than it
+   * was.
+   *
+   * Running it in an effect keyed on the stream means it fires after the
+   * render that creates the element.
+   */
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el || !localStream) return;
+    el.srcObject = localStream;
+    // Muted, or the room's own audio goes out of the speakers and straight
+    // back into the microphone.
+    el.muted = true;
+    void el.play().catch(() => { /* autoplay of a muted local stream */ });
+    return () => { el.srcObject = null; };
+  }, [localStream, publishing]);
+
   const toggleFullscreen = async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
@@ -256,6 +277,7 @@ export default function StreamDetailPage() {
       await publisherRef.current?.stop().catch(() => {});
       publisherRef.current = null;
       setPublishing(false);
+      setLocalStream(null);
 
       await api.post(`/streams/${id}/end`);
       toast.success('Stream ended — recording is processing');
