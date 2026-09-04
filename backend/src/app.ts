@@ -102,9 +102,23 @@ export async function buildApp(): Promise<FastifyInstance> {
     await app.register(fastifyCompress, {
       global:    true,
       encodings: ['gzip', 'deflate'],
-      // Below ~1 KB the header and CPU cost outweigh the saving, and tiny
-      // JSON acks are most of our traffic by count.
-      threshold: 1024,
+      /**
+       * Effectively disabled.
+       *
+       * On this deployment, compression produced responses with
+       * `content-encoding: gzip` and `content-length: 0` — a 200 with no body
+       * at all, captured straight from Node before nginx. Every response over
+       * the threshold came back empty, which is why the streams list,
+       * recordings, analytics and comments all rendered as "nothing yet" while
+       * single-item pages worked: those were small enough to slip under it.
+       *
+       * The cause has not been identified, and a compression layer that
+       * silently discards response bodies is far more expensive than the
+       * bandwidth it saves. Raising the threshold above any realistic payload
+       * turns it off in practice without removing the plugin, so it can be
+       * re-enabled by changing one number once the root cause is understood.
+       */
+      threshold: 10 * 1024 * 1024,
     });
   } catch (err) {
     logger.warn({ err }, 'Response compression unavailable — run `npm install`. Serving uncompressed.');
