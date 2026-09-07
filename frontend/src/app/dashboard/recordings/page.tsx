@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Video, Download, Wand2, Trash2 } from 'lucide-react';
+import { Video, Download, Wand2, Trash2, Play, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { api, getApiError, unwrap } from '@/lib/api';
@@ -10,6 +10,14 @@ interface Recording {
   id: string;
   stream_id: string;
   file_url: string | null;
+  /**
+   * A short-lived signed URL from the API.
+   *
+   * `file_url` is the public-style URL recorded at upload time, and the
+   * recordings bucket is private — following it returns "Bucket not found".
+   * Every play/download action must use this instead.
+   */
+  signedUrl?: string | null;
   duration_seconds: number | null;
   status: 'processing' | 'ready' | 'failed';
   created_at: string;
@@ -18,6 +26,7 @@ interface Recording {
 export default function RecordingsPage() {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
+  const [playing, setPlaying] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {

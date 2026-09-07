@@ -95,7 +95,29 @@ Null means don't apply. Return ONLY the JSON.`,
     const inputPath  = path.join(TMP, `${recordingId}_src.mp4`);
     const outputPath = path.join(TMP, `${editId}_out.mp4`);
 
-    const dl = await axios.get(fileUrl, { responseType: 'stream' });
+    /**
+     * Sign the URL here, at the moment of use.
+     *
+     * `fileUrl` on the recording row is what getPublicUrl produced at upload
+     * time, and the recordings bucket is private — fetching it returns
+     * `{"statusCode":"404","error":"Bucket not found"}`. Every AI edit failed
+     * on this line, which is why clicking the button appeared to do nothing.
+     *
+     * Signing at job time rather than at enqueue time also matters: a job can
+     * sit in the queue or be retried long after a URL minted earlier would
+     * have expired.
+     */
+    const sourcePath = String(fileUrl).split('/recordings/')[1];
+    if (!sourcePath) throw new Error('Recording file path could not be derived from its URL.');
+
+    const { data: signed, error: signErr } = await supabaseAdmin.storage
+      .from('recordings')
+      .createSignedUrl(sourcePath, 3600);
+    if (signErr || !signed?.signedUrl) {
+      throw new Error(`Could not sign the recording for download: ${signErr?.message ?? 'unknown'}`);
+    }
+
+    const dl = await axios.get(signed.signedUrl, { responseType: 'stream' });
     await new Promise<void>((res, rej) => {
       const ws = fs.createWriteStream(inputPath);
       dl.data.pipe(ws);

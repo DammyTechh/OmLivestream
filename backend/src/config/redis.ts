@@ -1,12 +1,98 @@
 import { Redis as UpstashRedis } from '@upstash/redis';
+import IORedis from 'ioredis';
 import { env } from './env';
 import { logger } from './logger';
 
-// ── Upstash REST client (HTTPS, works on any network) ──────────────
-const upstash = new UpstashRedis({
-  url:   env.UPSTASH_REDIS_REST_URL,
-  token: env.UPSTASH_REDIS_REST_TOKEN,
-});
+/**
+ * Two transports, one interface.
+ *
+ * Upstash's REST client speaks HTTPS and works from anywhere, which is what a
+ * platform-as-a-service needs. A VPS with Redis installed alongside the API
+ * does not: a TCP socket to 127.0.0.1 is faster, free, and has no monthly
+ * command quota to exhaust — and exhausting that quota took sign-in down,
+ * because OTP codes and OAuth state live here.
+ *
+ * Whichever is configured, the facade below exposes the same handful of
+ * methods, so nothing else in the codebase knows or cares which is in use.
+ */
+const useRest = Boolean(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN);
+
+/** Whichever endpoint is actually in use, for log lines only. */
+const redisEndpoint = (useRest ? env.UPSTASH_REDIS_REST_URL : env.UPSTASH_REDIS_URL) || 'unset';
+
+const upstash = useRest
+  ? new UpstashRedis({
+      url:   env.UPSTASH_REDIS_REST_URL as string,
+      token: env.UPSTASH_REDIS_REST_TOKEN as string,
+    })
+  : null;
+
+/**
+ * TCP client, used when no REST pair is set.
+ *
+ * `maxRetriesPerRequest: null` because a command that cannot reach Redis
+ * should surface through the same degradation path as everything else here,
+ * not throw from deep inside ioredis. `lazyConnect` is deliberately off: the
+ * first request must not be the one that opens the socket.
+ */
+const tcp = !useRest && env.UPSTASH_REDIS_URL
+  ? new IORedis(env.UPSTASH_REDIS_URL, {
+      maxRetriesPerRequest: null,
+      enableOfflineQueue: true,
+      lazyConnect: false,
+      ...(env.UPSTASH_REDIS_URL.startsWith('rediss://') ? { tls: {} } : {}),
+    })
+  : null;
+
+if (tcp) {
+  tcp.on('error', (err) => logger.warn({ err: err.message }, 'Redis (TCP) error'));
+  tcp.on('ready', () => logger.info('Redis (TCP) ready'));
+}
+
+
+/**
+ * One object with the small surface this file uses, backed by either client.
+ *
+ * Written as an adapter rather than by branching at each of the ten call sites
+ * below: the degradation, logging and in-memory fallback logic there is the
+ * delicate part, and duplicating it per transport is how the two drift apart.
+ *
+ * The signatures follow Upstash's, since that is what the existing code was
+ * written against; the TCP branch translates to ioredis' argument order.
+ */
+const client = {
+  async get<T>(key: string): Promise<T | null> {
+    if (upstash) return upstash.get<T>(key);
+    const v = await tcp!.get(key);
+    if (v === null) return null;
+    // Upstash parses JSON on read; ioredis returns the raw string. Matching
+    // that here keeps every caller — and every JSON.parse further up the
+    // stack — behaving identically on both transports.
+    try { return JSON.parse(v) as T; } catch { return v as unknown as T; }
+  },
+
+  async set(key: string, value: unknown, opts?: { ex?: number; nx?: boolean }): Promise<unknown> {
+    if (upstash) {
+      if (opts?.nx && opts.ex !== undefined) return upstash.set(key, value, { nx: true, ex: opts.ex });
+      if (opts?.ex !== undefined)            return upstash.set(key, value, { ex: opts.ex });
+      return upstash.set(key, value);
+    }
+    const raw = typeof value === 'string' ? value : JSON.stringify(value);
+    if (opts?.nx && opts.ex !== undefined) return tcp!.set(key, raw, 'EX', opts.ex, 'NX');
+    if (opts?.ex !== undefined)            return tcp!.set(key, raw, 'EX', opts.ex);
+    return tcp!.set(key, raw);
+  },
+
+  incr:   (key: string) => (upstash ? upstash.incr(key)   : tcp!.incr(key)),
+  decr:   (key: string) => (upstash ? upstash.decr(key)   : tcp!.decr(key)),
+  del:    (key: string) => (upstash ? upstash.del(key)    : tcp!.del(key)),
+  expire: (key: string, seconds: number) =>
+    (upstash ? upstash.expire(key, seconds) : tcp!.expire(key, seconds)),
+  rpush:  (key: string, value: unknown) =>
+    (upstash
+      ? upstash.rpush(key, value)
+      : tcp!.rpush(key, typeof value === 'string' ? value : JSON.stringify(value))),
+};
 
 /**
  * Resilient Redis facade.
@@ -61,7 +147,7 @@ function noteFailure(op: string, err: unknown): void {
   if (!degraded || now - lastWarnAt > 60_000) {
     lastWarnAt = now;
     logger.warn(
-      { err, op, host: safeHost(env.UPSTASH_REDIS_REST_URL) },
+        { err, op, transport: useRest ? 'upstash-rest' : 'tcp', host: safeHost(redisEndpoint) },
       'Redis unreachable — serving from in-process fallback. Rate limits are per-instance until it recovers.',
     );
   }
@@ -82,7 +168,7 @@ function safeHost(url: string): string {
 export const redis = {
   async get<T = string>(key: string): Promise<T | null> {
     try {
-      const v = await upstash.get<T>(key);
+      const v = await client.get<T>(key);
       noteSuccess();
       return v;
     } catch (err) {
@@ -97,8 +183,8 @@ export const redis = {
       // Split the call rather than passing `opts` through: the Upstash types
       // model `ex` as a discriminated union, so an optional `ex?: number`
       // doesn't narrow to any member.
-      if (opts?.ex !== undefined) await upstash.set(key, value, { ex: opts.ex });
-      else                        await upstash.set(key, value);
+      if (opts?.ex !== undefined) await client.set(key, value, { ex: opts.ex });
+      else                        await client.set(key, value);
       noteSuccess();
     } catch (err) {
       noteFailure('set', err);
@@ -113,7 +199,7 @@ export const redis = {
 
   async incr(key: string): Promise<number> {
     try {
-      const n = await upstash.incr(key);
+      const n = await client.incr(key);
       noteSuccess();
       return n;
     } catch (err) {
@@ -128,7 +214,7 @@ export const redis = {
 
   async decr(key: string): Promise<number> {
     try {
-      const n = await upstash.decr(key);
+      const n = await client.decr(key);
       noteSuccess();
       return n;
     } catch (err) {
@@ -154,7 +240,7 @@ export const redis = {
    */
   async setnx(key: string, value: string | number, ttlSec: number): Promise<boolean | null> {
     try {
-      const res = await upstash.set(key, value, { nx: true, ex: ttlSec });
+      const res = await client.set(key, value, { nx: true, ex: ttlSec });
       noteSuccess();
       return res === 'OK';
     } catch (err) {
@@ -165,7 +251,7 @@ export const redis = {
 
   async expire(key: string, seconds: number): Promise<void> {
     try {
-      await upstash.expire(key, seconds);
+      await client.expire(key, seconds);
       noteSuccess();
     } catch (err) {
       noteFailure('expire', err);
@@ -176,7 +262,7 @@ export const redis = {
 
   async del(key: string): Promise<void> {
     try {
-      await upstash.del(key);
+      await client.del(key);
       noteSuccess();
     } catch (err) {
       noteFailure('del', err);
@@ -186,7 +272,7 @@ export const redis = {
 
   async rpush(key: string, value: string): Promise<void> {
     try {
-      await upstash.rpush(key, value);
+      await client.rpush(key, value);
       noteSuccess();
     } catch (err) {
       // Deliberately NOT mirrored in memory: this carries base64 recording
@@ -202,7 +288,7 @@ export const redis = {
   /** Round-trip check used by the health endpoint. */
   async ping(): Promise<boolean> {
     try {
-      await upstash.set('health:ping', Date.now(), { ex: 30 });
+      await client.set('health:ping', Date.now(), { ex: 30 });
       noteSuccess();
       return true;
     } catch (err) {
@@ -212,7 +298,12 @@ export const redis = {
   },
 };
 
-logger.info({ host: safeHost(env.UPSTASH_REDIS_REST_URL) }, 'Redis (Upstash REST) initialised');
+logger.info(
+  { transport: useRest ? 'upstash-rest' : 'tcp', host: safeHost(redisEndpoint) },
+  useRest
+    ? 'Redis initialised (Upstash REST)'
+    : 'Redis initialised (TCP) — no Upstash quota applies',
+);
 
 
 /**

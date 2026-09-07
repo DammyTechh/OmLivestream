@@ -7,3 +7,20 @@ dist/
 coverage/
 rtmp-relay/rtmp-relay
 .DS_Store
+
+# Test and scratch files.
+#
+# Debugging this deployment produced .env.t (a full copy of production
+# secrets) and several throwaway scripts sitting next to the real code. None
+# were committed, but only because nobody ran `git add .` at the wrong moment.
+# Matching the patterns rather than the exact names means the next scratch file
+# is covered too.
+.env.*
+!.env.example
+!.env.production.example
+t.js
+rt.js
+vt.js
+boot-preload.js
+*.bak
+*.backup

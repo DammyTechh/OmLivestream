@@ -63,9 +63,24 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().startsWith('re_'),
   EMAIL_FROM: z.string().min(1),
 
+  /**
+   * Redis. Either a plain TCP URL, or Upstash's REST pair — at least one.
+   *
+   * The REST pair used to be mandatory, which meant a server with a perfectly
+   * good local Redis still refused to boot. That matters more than it sounds:
+   * Upstash's free tier caps at 500k commands a month, and when it is reached
+   * every sign-in fails with a 500 because OTP codes and OAuth state live
+   * here. Being unable to fall back to the Redis already installed on the box
+   * turned a quota email into an outage.
+   *
+   * `UPSTASH_REDIS_URL` despite the name is any redis:// or rediss:// URL,
+   * including redis://127.0.0.1:6379. The cross-check below enforces that at
+   * least one transport is configured, rather than discovering it at the first
+   * request.
+   */
   UPSTASH_REDIS_URL:        z.string().optional().default(''),
-  UPSTASH_REDIS_REST_URL:   z.string().url(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1),
+  UPSTASH_REDIS_REST_URL:   z.string().url().optional().or(z.literal('')),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional().default(''),
 
   PAYSTACK_SECRET_KEY: z.string().min(1),
   PAYSTACK_PUBLIC_KEY: z.string().min(1),
@@ -144,7 +159,24 @@ const envSchema = z.object({
   RATE_LIMIT_AUTH_WINDOW_MS: z.coerce.number().default(900000),
   RATE_LIMIT_API_MAX: z.coerce.number().default(100),
   RATE_LIMIT_API_WINDOW_MS: z.coerce.number().default(60000),
-});
+})
+  /**
+   * At least one Redis transport must be configured.
+   *
+   * Checked here so a missing configuration stops the server at boot with a
+   * clear message, rather than surfacing later as a 500 on sign-in — which is
+   * exactly how the Upstash quota exhaustion presented, and it took a support
+   * email to work out why.
+   */
+  .refine(
+    (v) => Boolean(v.UPSTASH_REDIS_URL) || Boolean(v.UPSTASH_REDIS_REST_URL && v.UPSTASH_REDIS_REST_TOKEN),
+    {
+      message:
+        'No Redis configured. Set UPSTASH_REDIS_URL (e.g. redis://127.0.0.1:6379 for the ' +
+        'Redis on this server), or both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.',
+      path: ['UPSTASH_REDIS_URL'],
+    },
+  );
 
 /**
  * Strip surrounding quotes and trailing whitespace from every value before

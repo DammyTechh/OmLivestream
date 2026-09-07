@@ -11,7 +11,37 @@ export class RecordingsService {
       .eq('user_id', userId).order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1);
     if (error) throw error;
-    return { data: data ?? [], total: count ?? 0 };
+
+    /**
+     * Sign every row here, not just in `get`.
+     *
+     * `file_url` holds the value `getPublicUrl` produced at upload time, and
+     * the recordings bucket is private — so following it returns
+     * `{"statusCode":"404","error":"Bucket not found"}`. The list page's
+     * download and play buttons used that URL directly, which is why they
+     * 404'd on a recording that had uploaded perfectly well.
+     *
+     * Signing in the list costs one call per row and makes every button on
+     * the page work without the client needing to fetch each recording
+     * individually first.
+     */
+    const rows = await Promise.all((data ?? []).map(async (r) => {
+      let signedUrl: string | null = null;
+      if (r.file_url && r.status === 'ready') {
+        const storagePath = String(r.file_url).split('/recordings/')[1];
+        if (storagePath) {
+          const { data: u } = await supabaseAdmin.storage
+            .from('recordings')
+            // An hour: long enough to watch or download a full broadcast,
+            // short enough that a copied link does not stay live indefinitely.
+            .createSignedUrl(storagePath, 3600);
+          signedUrl = u?.signedUrl ?? null;
+        }
+      }
+      return { ...r, signedUrl };
+    }));
+
+    return { data: rows, total: count ?? 0 };
   }
 
   async get(userId: string, recordingId: string) {

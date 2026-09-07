@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useLiveStreamGuard } from '@/hooks/useLiveStreamGuard';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -182,6 +182,7 @@ export default function StreamDetailPage() {
       // Held in state so the effect below can attach it once the <video>
       // element exists. Assigning here cannot work: setPublishing only
       // schedules a render, so previewRef is still null on this tick.
+      streamRef.current = handle.stream;
       setLocalStream(handle.stream);
       setPublishing(true);
 
@@ -236,28 +237,39 @@ export default function StreamDetailPage() {
   useEffect(() => () => { void publisherRef.current?.stop().catch(() => {}); }, []);
 
   /**
-   * Attach the camera to the preview once the element actually exists.
+   * Attach the camera with a callback ref, not an effect.
    *
-   * This used to run immediately after `setPublishing(true)`, which cannot
-   * work: setState only schedules a render, so on that tick the <video> has
-   * not been created and `previewRef.current` is still null. The assignment
-   * was silently skipped and the panel stayed black — while the stream itself
-   * was publishing perfectly well, which made it look far more broken than it
-   * was.
+   * An effect keyed on state assumes the <video> exists by the time it runs.
+   * That held in theory and kept failing in practice — the panel stayed black
+   * while the same track reached Facebook perfectly well, so the stream was
+   * fine and only the local attach was missing.
    *
-   * Running it in an effect keyed on the stream means it fires after the
-   * render that creates the element.
+   * A callback ref removes the assumption: React calls it with the node the
+   * moment it mounts, and with null when it unmounts. There is no ordering to
+   * get wrong, and it works no matter which state change caused the render.
+   *
+   * The stream is kept in a ref as well as state so this can attach it
+   * immediately, without waiting for another render.
    */
-  useEffect(() => {
-    const el = previewRef.current;
-    if (!el || !localStream) return;
-    el.srcObject = localStream;
-    // Muted, or the room's own audio goes out of the speakers and straight
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const attachPreview = useCallback((el: HTMLVideoElement | null) => {
+    previewRef.current = el;
+    if (!el) return;
+    const stream = streamRef.current;
+    if (!stream) return;
+
+    el.srcObject = stream;
+    // Muted, or the room's own audio leaves the speakers and goes straight
     // back into the microphone.
     el.muted = true;
-    void el.play().catch(() => { /* autoplay of a muted local stream */ });
-    return () => { el.srcObject = null; };
-  }, [localStream, publishing]);
+    el.play().catch((err) => {
+      // Surfaced rather than swallowed: a rejected play() is the difference
+      // between "no video" and "video is there but paused", and silently
+      // ignoring it is why this was hard to diagnose.
+      console.warn('[preview] play() was rejected', err);
+    });
+  }, []);
 
   const toggleFullscreen = async () => {
     try {
@@ -277,6 +289,7 @@ export default function StreamDetailPage() {
       await publisherRef.current?.stop().catch(() => {});
       publisherRef.current = null;
       setPublishing(false);
+      streamRef.current = null;
       setLocalStream(null);
 
       await api.post(`/streams/${id}/end`);
@@ -375,7 +388,7 @@ export default function StreamDetailPage() {
                 <span className="text-xs text-muted ml-auto">Your camera, as viewers see it</span>
               </div>
               <video
-                ref={previewRef}
+                ref={attachPreview}
                 playsInline
                 autoPlay
                 muted
