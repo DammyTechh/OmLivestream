@@ -11,6 +11,7 @@ import {
   TikTokIcon, XIcon, LinkedInIcon, KickIcon,
 } from '@/components/ui/BrandIcons';
 import { api, getApiError, unwrap } from '@/lib/api';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 /**
  * How a platform is connected, and what that connection can actually do.
@@ -72,6 +73,7 @@ interface Connection {
 
 function PlatformsContent() {
   const [conns, setConns]     = useState<Connection[]>([]);
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [keyFor, setKeyFor]   = useState<string | null>(null);
   const [form, setForm]       = useState({ rtmpUrl: '', streamKey: '' });
@@ -145,7 +147,13 @@ function PlatformsContent() {
 
   const disconnect = async (id: string) => {
     const c = find(id);
-    if (!c || !confirm(`Disconnect ${label(id)}? You can reconnect at any time.`)) return;
+    if (!c) return;
+    if (!(await confirm({
+      title: `Disconnect ${label(id)}?`,
+      message: 'Stored credentials for this platform are deleted and we lose all access to the account. You can reconnect at any time.',
+      confirmLabel: 'Disconnect',
+      destructive: true,
+    }))) return;
     try {
       await api.delete(`/platforms/${c.id}`);
       await fetchConns();

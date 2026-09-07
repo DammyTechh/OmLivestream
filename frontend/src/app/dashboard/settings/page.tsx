@@ -7,11 +7,13 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api, getApiError } from '@/lib/api';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { useAuth } from '@/store/auth';
 
 
 export default function SettingsPage() {
   const { user, refreshProfile } = useAuth();
+  const confirm = useConfirm();
   const [profile, setProfile] = useState({
     full_name: '',
     dob: '',
@@ -82,7 +84,11 @@ export default function SettingsPage() {
   };
 
   const removeAvatar = async () => {
-    if (!confirm('Remove your profile picture?')) return;
+    if (!(await confirm({
+      title: 'Remove your profile picture?',
+      message: 'Your initial will be shown instead. You can upload a new one at any time.',
+      confirmLabel: 'Remove',
+    }))) return;
     try {
       await api.patch('/users/me', { avatar_url: '' });
       setProfile((p) => ({ ...p, avatar_url: '' }));

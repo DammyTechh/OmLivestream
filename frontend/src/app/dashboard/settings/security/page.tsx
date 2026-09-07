@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { api, unwrap, getApiError } from '@/lib/api';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 /**
  * Security settings.
@@ -67,6 +68,7 @@ function when(iso: string | null): string {
 }
 
 export default function SecuritySettingsPage() {
+  const confirm = useConfirm();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [history, setHistory] = useState<LoginLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +102,12 @@ export default function SecuritySettingsPage() {
   };
 
   const revokeAll = async () => {
-    if (!confirm('Sign out of every device, including this one? You will need to sign in again.')) return;
+    if (!(await confirm({
+      title: 'Sign out of every device?',
+      message: 'This ends every session immediately, including this one, and any live broadcast will stop.',
+      confirmLabel: 'Sign out everywhere',
+      destructive: true,
+    }))) return;
     setBusy('all');
     try {
       await api.post('/users/me/sessions/revoke-all');

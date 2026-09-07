@@ -4,6 +4,7 @@ import { Video, Download, Wand2, Trash2, Play, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card } from '@/components/ui/Card';
 import { api, getApiError, unwrap } from '@/lib/api';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { formatDate } from '@/lib/utils';
 
 interface Recording {
@@ -24,6 +25,7 @@ interface Recording {
 }
 
 export default function RecordingsPage() {
+  const confirm = useConfirm();
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -47,7 +49,12 @@ export default function RecordingsPage() {
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this recording?')) return;
+    if (!(await confirm({
+      title: 'Delete this recording?',
+      message: 'The video file and its edits are removed permanently. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    }))) return;
     try {
       await api.delete(`/recordings/${id}`);
       setRecordings(recordings.filter(r => r.id !== id));
@@ -107,8 +114,23 @@ export default function RecordingsPage() {
                     <button onClick={() => edit(r.id)} className="p-2 rounded-xl bg-veil/5 hover:bg-primary/20 text-muted hover:text-primary transition" title="AI edit">
                       <Wand2 size={16} />
                     </button>
-                    {r.file_url && (
-                      <a href={r.file_url} download className="p-2 rounded-xl bg-veil/5 hover:bg-veil/10 text-muted hover:text-text transition" title="Download">
+                    {r.signedUrl && (
+                      <button
+                        onClick={() => setPlaying(playing === r.id ? null : r.id)}
+                        className="p-2 rounded-xl bg-veil/5 hover:bg-veil/10 text-muted hover:text-text transition"
+                        title={playing === r.id ? 'Hide preview' : 'Play'}
+                      >
+                        {playing === r.id ? <X size={16} /> : <Play size={16} />}
+                      </button>
+                    )}
+                    {/* signedUrl, not file_url.
+                        `file_url` holds the public-style URL written at upload
+                        time, and the recordings bucket is private — following
+                        it returns "Bucket not found". The API signs each ready
+                        recording for an hour, and that is the only URL that
+                        actually resolves. */}
+                    {r.signedUrl && (
+                      <a href={r.signedUrl} download className="p-2 rounded-xl bg-veil/5 hover:bg-veil/10 text-muted hover:text-text transition" title="Download">
                         <Download size={16} />
                       </a>
                     )}

@@ -11,6 +11,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api, unwrap, getApiError } from '@/lib/api';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { startPublishing, publishingUnsupportedReason, type PublishHandle } from '@/lib/publisher';
 import { formatNumber } from '@/lib/utils';
 import { useAuth } from '@/store/auth';
@@ -71,6 +72,7 @@ interface PlatformMetrics {
 export default function StreamDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const confirm = useConfirm();
   const [stream, setStream] = useState<StreamDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState(false);
@@ -281,7 +283,12 @@ export default function StreamDetailPage() {
   };
 
   async function endStream() {
-    if (!confirm('End this stream? The recording will start processing.')) return;
+    if (!(await confirm({
+      title: 'End this broadcast?',
+      message: 'Your stream stops on every platform straight away. The recording will start processing.',
+      confirmLabel: 'End stream',
+      destructive: true,
+    }))) return;
     setActioning(true);
     try {
       // Stop sending before telling the server to end, so the last frames are
