@@ -28,30 +28,56 @@ interface ConfirmOptions {
   cancelLabel?: string;
   /** Red styling and a warning mark, for anything irreversible. */
   destructive?: boolean;
+
+  /**
+   * Ask for text as well as agreement.
+   *
+   * `window.prompt` is the other OS dialog this replaces, and it is worse
+   * than confirm: no styling, no validation, and a single-line field with no
+   * room for the multi-sentence instructions the AI editor needs.
+   */
+  input?: {
+    label?: string;
+    placeholder?: string;
+    defaultValue?: string;
+    /** Renders a textarea instead of a single line. */
+    multiline?: boolean;
+    /** Confirm stays disabled until this returns true. */
+    validate?: (value: string) => boolean;
+    /** Shown under the field when validate fails and something has been typed. */
+    hint?: string;
+  };
 }
 
-type ConfirmFn = (opts: ConfirmOptions) => Promise<boolean>;
+/** Resolves to the entered text, or null if cancelled. Boolean dialogs get true/null. */
+type ConfirmFn = (opts: ConfirmOptions) => Promise<string | boolean | null>;
 
 const ConfirmContext = createContext<ConfirmFn | null>(null);
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [opts, setOpts] = useState<ConfirmOptions>({ title: '' });
+  const [value, setValue] = useState('');
   // Held in a ref because the promise is created in one render and settled in
   // another; state would be stale by the time the buttons are clicked.
-  const resolver = useRef<((v: boolean) => void) | null>(null);
+  const resolver = useRef<((v: string | boolean | null) => void) | null>(null);
 
   const confirm = useCallback<ConfirmFn>((o) => {
     setOpts(o);
+    setValue(o.input?.defaultValue ?? '');
     setOpen(true);
-    return new Promise<boolean>((resolve) => { resolver.current = resolve; });
+    return new Promise<string | boolean | null>((resolve) => { resolver.current = resolve; });
   }, []);
 
-  const settle = (value: boolean) => {
+  const settle = (ok: boolean) => {
     setOpen(false);
-    resolver.current?.(value);
+    // Cancelling is always null, so a caller can distinguish "dismissed" from
+    // "confirmed with an empty field".
+    resolver.current?.(ok ? (opts.input ? value : true) : null);
     resolver.current = null;
   };
+
+  const valid = !opts.input?.validate || opts.input.validate(value);
 
   return (
     <ConfirmContext.Provider value={confirm}>
@@ -102,6 +128,42 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
 
+                {opts.input && (
+                  <div className="mt-5">
+                    {opts.input.label && (
+                      <label className="block text-xs font-medium text-muted mb-2">
+                        {opts.input.label}
+                      </label>
+                    )}
+                    {opts.input.multiline ? (
+                      <textarea
+                        autoFocus
+                        rows={3}
+                        value={value}
+                        placeholder={opts.input.placeholder}
+                        onChange={(e) => setValue(e.target.value)}
+                        className="w-full rounded-xl bg-veil/5 border border-border px-3.5 py-2.5
+                                   text-sm outline-none focus:border-primary transition resize-none"
+                      />
+                    ) : (
+                      <input
+                        autoFocus
+                        value={value}
+                        placeholder={opts.input.placeholder}
+                        onChange={(e) => setValue(e.target.value)}
+                        // Enter confirms a single-line field, which is what
+                        // anyone typing into one expects.
+                        onKeyDown={(e) => { if (e.key === 'Enter' && valid) settle(true); }}
+                        className="w-full rounded-xl bg-veil/5 border border-border px-3.5 py-2.5
+                                   text-sm outline-none focus:border-primary transition"
+                      />
+                    )}
+                    {opts.input.hint && !valid && value.length > 0 && (
+                      <p className="text-xs text-danger mt-2">{opts.input.hint}</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex gap-2 mt-6">
                   <Button variant="secondary" onClick={() => settle(false)} className="flex-1">
                     {opts.cancelLabel ?? 'Cancel'}
@@ -110,7 +172,8 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                     variant={opts.destructive ? 'danger' : 'primary'}
                     onClick={() => settle(true)}
                     className="flex-1"
-                    autoFocus
+                    disabled={!valid}
+                    autoFocus={!opts.input}
                   >
                     {opts.confirmLabel ?? 'Confirm'}
                   </Button>
@@ -133,5 +196,8 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
  */
 export function useConfirm(): ConfirmFn {
   const ctx = useContext(ConfirmContext);
-  return ctx ?? (async (o) => window.confirm(o.message ? `${o.title}\n\n${o.message}` : o.title));
+  return ctx ?? (async (o) => {
+    if (o.input) return window.prompt(o.title, o.input.defaultValue ?? '');
+    return window.confirm(o.message ? `${o.title}\n\n${o.message}` : o.title) ? true : null;
+  });
 }

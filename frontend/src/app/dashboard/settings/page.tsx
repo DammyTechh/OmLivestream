@@ -116,7 +116,23 @@ export default function SettingsPage() {
   };
 
   const deleteAccount = async () => {
-    const txt = window.prompt('Type DELETE to confirm account deletion. This cannot be undone.');
+    const txt = await confirm({
+      title: 'Delete your account?',
+      message:
+        'This removes your profile, connected platforms, recordings and analytics, and cancels your subscription. ' +
+        'It cannot be undone.',
+      confirmLabel: 'Delete my account',
+      destructive: true,
+      input: {
+        label: 'Type DELETE to confirm',
+        placeholder: 'DELETE',
+        // Typing the word is the point: it makes an irreversible action
+        // deliberate rather than one careless click. The button stays
+        // disabled until it matches exactly.
+        validate: (v) => v.trim() === 'DELETE',
+        hint: 'Type DELETE exactly, in capitals.',
+      },
+    });
     if (txt !== 'DELETE') return;
     try {
       await api.delete('/users/me');

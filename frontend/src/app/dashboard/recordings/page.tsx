@@ -63,8 +63,23 @@ export default function RecordingsPage() {
   };
 
   const edit = async (id: string) => {
-    const prompt = window.prompt('Describe the edits you want (AI will apply them):', 'Trim first 2 minutes, add captions');
-    if (!prompt) return;
+    const prompt = await confirm({
+      title: 'AI edit',
+      message: 'Describe what you want changed and the AI will apply it to a copy. Your original recording is never modified.',
+      confirmLabel: 'Start edit',
+      input: {
+        label: 'What should it do?',
+        placeholder: 'Trim the first 2 minutes, add captions, remove long pauses…',
+        defaultValue: 'Trim first 2 minutes, add captions',
+        // A textarea, because a useful instruction is a sentence or two and a
+        // single-line field encourages the one-word prompts that produce poor
+        // edits.
+        multiline: true,
+        validate: (v) => v.trim().length >= 4,
+        hint: 'Describe the edit in a few words.',
+      },
+    });
+    if (typeof prompt !== 'string' || !prompt.trim()) return;
     try {
       await api.post(`/recordings/${id}/ai-edit`, { prompt });
       toast.success('AI edit queued — check back soon');
@@ -140,6 +155,27 @@ export default function RecordingsPage() {
                   </div>
                 )}
               </div>
+
+              {/* The recording itself, played in place.
+                  Mounted only while open — one <video> per row would have the
+                  browser fetch metadata for every recording on the page, which
+                  on a long list is a lot of requests for something nobody has
+                  asked to watch yet. */}
+              {playing === r.id && r.signedUrl && (
+                <div className="mt-4 rounded-2xl overflow-hidden border border-border bg-black">
+                  <video
+                    src={r.signedUrl}
+                    controls
+                    autoPlay
+                    playsInline
+                    preload="metadata"
+                    className="w-full aspect-video"
+                    // The signed URL expires after an hour. Saying so beats a
+                    // silent black rectangle if someone leaves the page open.
+                    onError={() => toast.error('This preview link expired. Refresh the page and try again.')}
+                  />
+                </div>
+              )}
             </Card>
           ))}
         </div>
