@@ -19,6 +19,8 @@ interface Recording {
    * Every play/download action must use this instead.
    */
   signedUrl?: string | null;
+  /** The parent stream, joined by the API — used for the display title. */
+  streams?: { title?: string | null; started_at?: string | null } | null;
   duration_seconds: number | null;
   status: 'processing' | 'ready' | 'failed';
   created_at: string;
@@ -105,14 +107,24 @@ export default function RecordingsPage() {
         <div className="grid gap-3">
           {recordings.map((r) => (
             <Card key={r.id} className="p-5">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 min-w-0">
+                {/* Stacks on a phone. A single row with the actions pinned
+                    right squeezed the title to "Recordi…" on a 390px screen
+                    and pushed four buttons on top of the date. Below `sm`
+                    the text gets full width and the actions sit under it. */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shrink-0">
                     <Video size={20} className="text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <div className="font-medium truncate">Recording · {r.id.slice(0, 8)}</div>
-                    <div className="flex items-center gap-3 text-xs text-muted mt-0.5">
+                      {/* The broadcast's own title. It was already being
+                          selected by the API and ignored, so every row read
+                          "Recording · 6d62723e" — a database id, which says
+                          nothing about which broadcast it was. */}
+                      <div className="font-medium truncate">
+                        {r.streams?.title?.trim() || `Recording · ${r.id.slice(0, 8)}`}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted mt-1">
                       <span>{formatDate(r.created_at)}</span>
                       <span>·</span>
                       <span>{formatDuration(r.duration_seconds)}</span>
@@ -125,7 +137,7 @@ export default function RecordingsPage() {
                   </div>
                 </div>
                 {r.status === 'ready' && (
-                  <div className="flex gap-2">
+                    <div className="flex gap-2 shrink-0 self-end sm:self-auto">
                     <button onClick={() => edit(r.id)} className="p-2 rounded-xl bg-veil/5 hover:bg-primary/20 text-muted hover:text-primary transition" title="AI edit">
                       <Wand2 size={16} />
                     </button>
