@@ -42,17 +42,22 @@ export const SOCIAL_URL = {
   youtube:   social(process.env.NEXT_PUBLIC_SOCIAL_YOUTUBE,   'https://www.youtube.com/@omlivestream_madeeasy'),
   tiktok:    social(process.env.NEXT_PUBLIC_SOCIAL_TIKTOK,    'https://www.tiktok.com/@omlivestreammade'),
   instagram: social(process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM, 'https://www.instagram.com/omlivestream_madeeasy'),
-  // A /share/ link, not a vanity URL. It resolves, but a canonical
-  // facebook.com/<pagename> URL is a stronger `sameAs` signal — set the env var
-  // once the Page has a username.
-  facebook:  social(process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK,  'https://www.facebook.com/share/1GnjmjSrtF/'),
+  facebook:  social(process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK,  'https://www.facebook.com/omlivestream'),
   x:         social(process.env.NEXT_PUBLIC_SOCIAL_X,         'https://x.com/omlive_stream'),
   threads:   social(process.env.NEXT_PUBLIC_SOCIAL_THREADS,   'https://www.threads.com/@omlivestream_madeeasy'),
 } as const;
 
 export type SocialKey = keyof typeof SOCIAL_URL;
 
-/** Handles, derived from the URLs above — used for display (@name) only. */
+/**
+ * The handle shown next to each icon, taken from the last path segment.
+ *
+ * This briefly needed a hardcoded exception: Facebook's link was a
+ * `/share/1GnjmjSrtF/` URL, and deriving a name from it produced
+ * "@1GnjmjSrtF" in the footer — a share id presented as an account name. With
+ * a real vanity URL in place the derivation works for every platform again,
+ * so the exception is gone rather than left behind as dead configuration.
+ */
 export const SOCIAL_HANDLE: Record<SocialKey, string> = Object.fromEntries(
   Object.entries(SOCIAL_URL).map(([k, url]) => {
     const last = url.replace(/\/+$/, '').split('/').pop() ?? '';

@@ -3,8 +3,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   Radio, MessageSquare, Gauge, Video, Wand2, Scissors, SlidersHorizontal,
-  Users, Clock, TrendingUp, Layers, Sparkles, ArrowRight, Check,
-} from 'lucide-react';
+  Users, Clock, TrendingUp, Layers, Sparkles, ArrowRight, } from 'lucide-react';
 
 const FEATURES = [
   { Icon: Radio,             title: 'Multi-Platform Streaming', desc: 'Broadcast to Facebook, TikTok, Instagram, Twitch, YouTube and more at once — from a single unified dashboard.' },
@@ -39,13 +38,6 @@ const VALUE = [
   { Icon: Gauge,      text: 'Improve stream quality with intelligent network optimization.' },
   { Icon: Wand2,      text: 'Repurpose live content faster with AI-assisted editing.' },
   { Icon: Radio,      text: 'Eliminate multiple devices and complicated streaming setups.' },
-];
-
-const ROADMAP = [
-  'Mobile Applications (iOS & Android)',
-  'Desktop Software (Windows & macOS)',
-  'Additional AI-powered creator tools',
-  'More platform integrations and advanced analytics',
 ];
 
 const reveal = {
@@ -209,53 +201,45 @@ export function AboutContent() {
         </div>
       </section>
 
-      {/* Roadmap + waitlist */}
-      <section className="relative py-20">
-        <div className="mx-auto max-w-6xl px-6">
-          <motion.div
-            {...reveal}
-            className="rounded-3xl bg-gradient-to-br from-primary/10 via-primary-deep/[0.06] to-accent/10 border border-primary/25 p-8 md:p-12"
-          >
-            <div className="grid lg:grid-cols-2 gap-10 items-center">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-veil/5 border border-veil/10 text-xs text-muted mb-5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" /> On the roadmap
-                </div>
-                <h2 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-4">
-                  Available on the web today — with more on the way.
-                </h2>
-                <p className="text-muted leading-relaxed mb-6">
-                  OmliveStream runs on a subscription model built for professional creators and
-                  organizations. We're just getting started — here's what's coming next.
-                </p>
-                <ul className="space-y-3">
-                  {ROADMAP.map((r, i) => (
-                    <li key={i} className="flex items-center gap-3 text-sm text-text/90">
-                      <Check size={16} className="text-primary shrink-0" />
-                      {r}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rounded-2xl bg-surface/70 border border-border p-7">
-                <Users size={22} className="text-primary mb-4" />
-                <h3 className="font-display text-xl font-semibold mb-2">Start streaming today</h3>
-                <p className="text-sm text-muted leading-relaxed mb-5">
-                  OmliveStream is live. Create an account, connect your platforms, and
-                  broadcast to all of them at once — <span className="text-text font-medium">free
-                  to start</span>, with no card required.
-                </p>
+        {/* Sign-up call to action.
+        
+            The roadmap panel that used to sit here has been removed. Listing
+            unreleased features on a live product invites the question of when
+            they arrive, and the answer is not one we can commit to yet — so it
+            was raising expectations rather than earning sign-ups. The single
+            action remains, now centred and given the whole width. */}
+        <section className="relative py-20">
+          <div className="mx-auto max-w-3xl px-6">
+            <motion.div
+              {...reveal}
+              className="rounded-3xl bg-gradient-to-br from-primary/10 via-primary-deep/[0.06] to-accent/10 border border-primary/25 p-8 md:p-12 text-center"
+            >
+              <Users size={24} className="text-primary mx-auto mb-5" />
+              <h2 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-4">
+                Start streaming today
+              </h2>
+              <p className="text-muted leading-relaxed mb-8 max-w-xl mx-auto">
+                OmliveStream is live. Create an account, connect your platforms, and broadcast
+                to all of them at once — <span className="text-text font-medium">free to
+                start</span>, with no card required.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link
                   href="/auth/signup"
-                  className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-white font-semibold hover:bg-primary/90 transition shadow-lg shadow-primary/25"
+                  className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-primary text-white font-semibold hover:bg-primary/90 transition shadow-lg shadow-primary/25"
                 >
                   Create your account <ArrowRight size={18} />
                 </Link>
+                <Link
+                  href="/auth/signin"
+                  className="inline-flex items-center justify-center px-7 py-3.5 rounded-2xl border border-border text-text font-semibold hover:bg-veil/5 transition"
+                >
+                  Sign in
+                </Link>
               </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+            </motion.div>
+          </div>
+        </section>
     </>
   );
 }
