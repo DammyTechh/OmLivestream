@@ -329,7 +329,11 @@ function buildFfmpegArgs(opts: {
       '-c:v', 'libx264',
       '-preset', 'veryfast',
       '-tune', 'zerolatency',
-      '-profile:v', 'main',
+      // High, not main. Every platform and every device made in the last
+      // decade decodes High profile, and it gives noticeably better quality
+      // at the same bitrate through CABAC and 8x8 transforms.
+      '-profile:v', 'high',
+      '-level', '4.1',
       '-pix_fmt', 'yuv420p',
       '-g', '60',              // keyframe every 2s at 30fps — platforms want <=4s
       '-keyint_min', '60',
@@ -342,7 +346,14 @@ function buildFfmpegArgs(opts: {
 
   if (hasAudio) {
     // Opus cannot live in FLV, so this transcode is mandatory.
-    args.push('-c:a', 'aac', '-b:a', '160k', '-ar', '44100', '-ac', '2');
+    /**
+     * 192k at 48kHz, not 160k at 44.1kHz.
+     *
+     * WebRTC captures Opus at 48kHz, so resampling to 44.1k threw away quality
+     * and spent CPU doing it. Every platform accepts 48kHz AAC, and 192k is
+     * where music and room tone stop sounding obviously compressed.
+     */
+    args.push('-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2');
   }
 
   // FLV needs SPS/PPS in-band on every keyframe for mid-stream joiners.
