@@ -19,6 +19,16 @@ interface Recording {
    * Every play/download action must use this instead.
    */
   signedUrl?: string | null;
+  /**
+   * A second signed URL carrying `Content-Disposition: attachment`.
+   *
+   * HTML's `download` attribute is ignored cross-origin, and storage is a
+   * different origin — so the plain link navigated to the file and played it
+   * rather than saving it. This one the browser must save, whatever the
+   * origin, and it arrives named after the broadcast rather than
+   * "recording.mp4".
+   */
+  downloadUrl?: string | null;
   /** The parent stream, joined by the API — used for the display title. */
   streams?: { title?: string | null; started_at?: string | null } | null;
   duration_seconds: number | null;
@@ -156,8 +166,13 @@ export default function RecordingsPage() {
                         it returns "Bucket not found". The API signs each ready
                         recording for an hour, and that is the only URL that
                         actually resolves. */}
-                    {r.signedUrl && (
-                      <a href={r.signedUrl} download className="p-2 rounded-xl bg-veil/5 hover:bg-veil/10 text-muted hover:text-text transition" title="Download">
+                    {(r.downloadUrl || r.signedUrl) && (
+                      <a
+                        href={(r.downloadUrl ?? r.signedUrl) ?? undefined}
+                        download
+                        className="p-2 rounded-xl bg-veil/5 hover:bg-veil/10 text-muted hover:text-text transition"
+                        title="Download"
+                      >
                         <Download size={16} />
                       </a>
                     )}

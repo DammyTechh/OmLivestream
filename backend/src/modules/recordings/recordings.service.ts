@@ -4,6 +4,29 @@ import { NotFoundError, AppError, PremiumRequiredError } from '../../utils/error
 import { videoEditQueue, videoPublishQueue } from '../../jobs/queues';
 import type { Platform } from '../../types/database';
 
+/**
+ * A filename someone can recognise in their downloads folder.
+ *
+ * Every recording is stored as `recording.mp4`, so without this a creator ends
+ * up with recording.mp4, recording(1).mp4, recording(2).mp4 and no way to tell
+ * which broadcast is which. Using the stream title and date fixes that.
+ *
+ * Stripped to a conservative character set because this ends up in a
+ * Content-Disposition header, where quotes, semicolons and newlines can
+ * truncate the filename or worse.
+ */
+function downloadName(row: { streams?: { title?: string | null } | null; created_at?: string }): string {
+  const title = row.streams?.title?.trim() || 'recording';
+  const date  = (row.created_at ?? '').slice(0, 10);
+  const safe  = title
+    .replace(/[^\p{L}\p{N}\s._-]/gu, '')   // letters, numbers, space, dot, underscore, hyphen
+    .replace(/\s+/g, '-')
+    .slice(0, 60)
+    .replace(/^-+|-+$/g, '') || 'recording';
+  return date ? `${safe}-${date}.mp4` : `${safe}.mp4`;
+}
+
+
 export class RecordingsService {
   async list(userId: string, page = 1, limit = 20) {
     const { data, error, count } = await supabaseAdmin.from('recordings')
@@ -27,18 +50,36 @@ export class RecordingsService {
      */
     const rows = await Promise.all((data ?? []).map(async (r) => {
       let signedUrl: string | null = null;
+      let downloadUrl: string | null = null;
       if (r.file_url && r.status === 'ready') {
         const storagePath = String(r.file_url).split('/recordings/')[1];
         if (storagePath) {
-          const { data: u } = await supabaseAdmin.storage
-            .from('recordings')
-            // An hour: long enough to watch or download a full broadcast,
-            // short enough that a copied link does not stay live indefinitely.
-            .createSignedUrl(storagePath, 3600);
-          signedUrl = u?.signedUrl ?? null;
+          const [play, dl] = await Promise.all([
+            // For the inline player: plays in the page.
+            supabaseAdmin.storage.from('recordings')
+              // An hour — long enough to watch or download a full broadcast,
+              // short enough that a copied link does not stay live for ever.
+              .createSignedUrl(storagePath, 3600),
+            /**
+             * For the download button.
+             *
+             * HTML's `download` attribute is ignored cross-origin, and storage
+             * is a different origin — so the browser navigated to the file and
+             * played it instead of saving it. Passing `download` makes Supabase
+             * send `Content-Disposition: attachment`, which the browser must
+             * honour whatever the origin.
+             *
+             * The filename is set here too, so the saved file is not called
+             * "recording.mp4" for every broadcast the user has ever made.
+             */
+            supabaseAdmin.storage.from('recordings')
+              .createSignedUrl(storagePath, 3600, { download: downloadName(r) }),
+          ]);
+          signedUrl   = play.data?.signedUrl ?? null;
+          downloadUrl = dl.data?.signedUrl ?? null;
         }
       }
-      return { ...r, signedUrl };
+      return { ...r, signedUrl, downloadUrl };
     }));
 
     return { data: rows, total: count ?? 0 };
@@ -51,11 +92,18 @@ export class RecordingsService {
     if (error || !data) throw new NotFoundError('Recording');
 
     let signedUrl: string | null = null;
+    let downloadUrl: string | null = null;
     if (data.file_url && data.status === 'ready') {
       const storagePath = data.file_url.split('/recordings/')[1];
       if (storagePath) {
-        const { data: urlData } = await supabaseAdmin.storage.from('recordings').createSignedUrl(storagePath, 3600);
-        signedUrl = urlData?.signedUrl ?? null;
+        const [play, dl] = await Promise.all([
+          supabaseAdmin.storage.from('recordings').createSignedUrl(storagePath, 3600),
+          // See downloadName above: forces a save rather than playback.
+          supabaseAdmin.storage.from('recordings')
+            .createSignedUrl(storagePath, 3600, { download: downloadName(data) }),
+        ]);
+        signedUrl   = play.data?.signedUrl ?? null;
+        downloadUrl = dl.data?.signedUrl ?? null;
       }
     }
     return { ...data, signedUrl };

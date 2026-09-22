@@ -163,8 +163,33 @@ export async function startPublishing(opts: PublishOptions): Promise<PublishHand
   const stream = existingStream?.getVideoTracks().length
     ? existingStream
     : await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-        audio: { echoCancellation: true, noiseSuppression: true },
+        /**
+         * Ask for 1080p, accept whatever the camera can give.
+         *
+         * This is the single biggest lever on output quality, because when the
+         * browser sends H.264 the server copies the stream through to RTMP
+         * untouched — `-c:v copy`, no re-encode. Whatever the browser produces
+         * is exactly what Facebook and YouTube receive, so capturing at 720p
+         * put a hard ceiling on the whole pipeline.
+         *
+         * `ideal` rather than `exact`: a webcam that cannot do 1080p returns
+         * its best instead of failing outright, which is what `exact` would do.
+         */
+        video: {
+          width:     { ideal: 1920, max: 1920 },
+          height:    { ideal: 1080, max: 1080 },
+          frameRate: { ideal: 30, max: 30 },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          // On by default in most browsers and it pumps the level up and down,
+          // which is audible and unpleasant on anything musical. The encoder
+          // handles range better than the browser's AGC does.
+          autoGainControl: false,
+          sampleRate: 48000,
+          channelCount: 2,
+        },
       });
 
   const videoTrack = stream.getVideoTracks()[0];
@@ -184,17 +209,54 @@ export async function startPublishing(opts: PublishOptions): Promise<PublishHand
      * the server forward whichever the uplink can currently carry, so a weak
      * connection degrades to a smaller picture rather than freezing.
      */
+    /**
+     * Tell the encoder this is camera footage, not a static screen share.
+     *
+     * With 'motion' it spends bits on temporal smoothness; with 'detail' it
+     * preserves sharp edges at the cost of fluidity. A person talking wants
+     * the former — the default guess is often wrong for webcam input.
+     */
+    try { (videoTrack as MediaStreamTrack & { contentHint?: string }).contentHint = 'motion'; } catch { /* older browsers */ }
+
     producers.push(
       await transport.produce({
         track: videoTrack,
         encodings: [
-          { rid: 'low',  maxBitrate: 300_000,   scaleResolutionDownBy: 4 },
-          { rid: 'mid',  maxBitrate: 900_000,   scaleResolutionDownBy: 2 },
-          { rid: 'high', maxBitrate: 3_000_000, scaleResolutionDownBy: 1 },
+          // Three layers sized for 1080p. Raising the top layer is safe on a
+          // weak connection: simulcast means the server forwards whichever
+          // layer the uplink can actually sustain, so a poor network drops to
+          // 'mid' rather than stuttering at 'high'. The old 3 Mbps ceiling was
+          // limiting good connections for no benefit to bad ones.
+          { rid: 'low',  maxBitrate:   400_000, scaleResolutionDownBy: 4 },   // 480p
+          { rid: 'mid',  maxBitrate: 1_500_000, scaleResolutionDownBy: 2 },   // 720p
+          { rid: 'high', maxBitrate: 5_000_000, scaleResolutionDownBy: 1 },   // 1080p
         ],
-        codecOptions: { videoGoogleStartBitrate: 1000 },
+        codecOptions: { videoGoogleStartBitrate: 2000 },
       }),
     );
+
+    /**
+     * Keep resolution, sacrifice frame rate under pressure.
+     *
+     * The browser's default drops resolution first, which on a talking-head
+     * broadcast makes a face soft and keeps it that way, and turns text on a
+     * shared slide unreadable. A brief dip to 24fps is far less noticeable
+     * than a permanent drop to 540p.
+     *
+     * Set on the RTP sender because mediasoup does not expose it as a producer
+     * option, and wrapped because Safari has not always supported it — a
+     * browser that ignores this still streams perfectly well.
+     */
+    try {
+      const videoProducer = producers[0] as unknown as { rtpSender?: RTCRtpSender };
+      const sender = videoProducer?.rtpSender;
+      if (sender) {
+        const params = sender.getParameters();
+        (params as RTCRtpSendParameters & { degradationPreference?: string })
+          .degradationPreference = 'maintain-resolution';
+        await sender.setParameters(params);
+      }
+    } catch { /* unsupported in this browser; the stream is unaffected */ }
 
     if (audioTrack) {
       producers.push(
