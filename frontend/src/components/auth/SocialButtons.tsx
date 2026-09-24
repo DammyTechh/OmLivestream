@@ -34,7 +34,7 @@ const GRID_COLS: Record<number, string> = {
  * vanish a beat later, and any click landing in that window would open a
  * provider error page.
  */
-const OPTIMISTIC: Provider[] = ['google', 'facebook'];
+const OPTIMISTIC: Provider[] = ['google'];
 
 export function SocialButtons({ label = 'or continue with' }: { label?: string }) {
   const [loading, setLoading]   = useState<Provider | null>(null);

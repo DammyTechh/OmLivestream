@@ -20,7 +20,17 @@ import { sendSuccess } from '../../utils/response';
  *  exactly the state this flow was in before. */
 const PROVIDERS: { id: SocialProvider; label: string }[] = [
   { id: 'google',    label: 'Google'    },
-  { id: 'facebook',  label: 'Facebook'  },
+  // Facebook is deliberately absent from *sign-in*.
+  //
+  // It remains fully available for *broadcasting* — connecting a Page and
+  // pushing RTMP to it is unaffected by this list, which governs only the
+  // "continue with" buttons on the sign-in screen.
+  //
+  // Removing it here rather than hiding the button in the frontend is what
+  // makes it real: the UI asks this endpoint which providers are live, so one
+  // change removes the button, and the authorize route stops accepting
+  // 'facebook' at the same moment. Hiding it client-side would leave the
+  // endpoint reachable by anyone who kept an old link.
   // Instagram is deliberately absent from *sign-in*, for two separate reasons:
   //
   //  1. It cannot work. Sign-in used the Instagram Basic Display API, which

@@ -109,7 +109,7 @@ export function StreamGraphic({ className }: { className?: string }) {
           <motion.div
             animate={{ scale: [1, 1.04, 1] }}
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            className="relative w-[24%] min-w-[76px] aspect-square rounded-3xl
+            className="relative w-[24%] min-w-[56px] aspect-square rounded-2xl sm:rounded-3xl
                        bg-gradient-to-br from-[#7C3AED] to-[#EC4899]
                        flex items-center justify-center
                        shadow-[0_0_60px_rgba(168,85,247,0.45)]"
@@ -142,8 +142,27 @@ export function StreamGraphic({ className }: { className?: string }) {
               initial={{ opacity: 0, scale: 0.6 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.15 * i, duration: 0.5 }}
-              className="absolute -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${(x / 360) * 100}%`, top: `${(y / 360) * 100}%` }}
+              /* Size lives on the positioned element, not the inner tile.
+                 A percentage width on the inner div resolves against this one,
+                 which is shrink-to-fit — a circular dependency the browser
+                 settles by treating the width as auto, so the tile fell back to
+                 its min-width and the proportions went out. This element is
+                 positioned against the orbit, which has a definite width. */
+              className="absolute w-[16%] min-w-[38px] max-w-[56px] aspect-square"
+              style={{
+                // Centred with calc, not `-translate-x-1/2`.
+                //
+                // framer-motion writes an inline `transform` for its scale animation,
+                // which overrides a Tailwind translate class — so the tiles sat with
+                // their left edge on the seat instead of their centre, shifting the whole
+                // orbit right by half a tile. Measured at 27px of a 55px tile, which is
+                // exactly that.
+                //
+                // Subtracting half the tile width in the offset itself cannot be undone
+                // by an animation. The container is square, so the same 8% works for top.
+                left: `calc(${(x / 360) * 100}% - 8%)`,
+                top:  `calc(${(y / 360) * 100}% - 8%)`,
+              }}
             >
               <motion.div
                 animate={{ y: [0, -5, 0] }}
@@ -151,12 +170,14 @@ export function StreamGraphic({ className }: { className?: string }) {
                   duration: 4, repeat: Infinity, ease: 'easeInOut',
                   delay: i * 0.4,
                 }}
-                className="w-14 h-14 rounded-2xl bg-[#14102A] text-white
+                className="w-full h-full rounded-xl sm:rounded-2xl bg-[#14102A] text-white
                            border border-primary/25 flex items-center justify-center
                            shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
                 title={label}
               >
-                <Icon size={26} />
+                {/* These brand icons take a numeric size only. 22 reads well at the
+                    38px minimum and is not lost at the 56px maximum. */}
+                <Icon size={22} />
               </motion.div>
             </motion.div>
           );
