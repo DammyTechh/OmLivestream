@@ -54,7 +54,12 @@ api.interceptors.response.use(
       const isAdmin = original.url?.startsWith('/admin') ?? false;
       const refreshKey = isAdmin ? TOKEN_KEYS.ADMIN_REFRESH : TOKEN_KEYS.REFRESH;
       const accessKey  = isAdmin ? TOKEN_KEYS.ADMIN_ACCESS  : TOKEN_KEYS.ACCESS;
-      const refreshToken = localStorage.getItem(refreshKey);
+      // Read through tokenStore, not localStorage.
+      //
+      // tokenStore keeps the cookie as the source of truth and mirrors to
+      // localStorage; reading localStorage directly can miss a session
+      // established on another subdomain.
+      const refreshToken = tokenStore.get(refreshKey);
       if (!refreshToken) return Promise.reject(err);
 
       if (isRefreshing) {
@@ -70,14 +75,29 @@ api.interceptors.response.use(
         const { data } = await axios.post(`${API_URL}${refreshPath}`, { refreshToken });
         const newToken = data?.data?.accessToken;
         if (!newToken) throw new Error('No token in refresh response');
-        localStorage.setItem(accessKey, newToken);
+        /**
+         * Write through tokenStore, not localStorage.
+         *
+         * This is the bug that made every admin session look permanently
+         * expired. The request interceptor reads with `tokenStore.get`, which
+         * treats the cookie as authoritative — but the refreshed token was
+         * being written only to localStorage. The cookie kept the expired
+         * token, so every retry re-sent it, 401'd, refreshed again, and got
+         * nowhere: "Your session has expired" on every admin page, for ever.
+         *
+         * It affects normal sessions identically; they just hide it, because
+         * signing in again rewrites the cookie.
+         */
+        tokenStore.set(accessKey, newToken);
         queue.forEach((cb) => cb(newToken));
         queue = [];
         original.headers.Authorization = `Bearer ${newToken}`;
         return api(original);
       } catch {
-        localStorage.removeItem(accessKey);
-        localStorage.removeItem(refreshKey);
+        // Clear both stores, or a stale cookie would keep being sent after a
+        // failed refresh.
+        tokenStore.remove(accessKey);
+        tokenStore.remove(refreshKey);
         localStorage.removeItem(isAdmin ? TOKEN_KEYS.ADMIN_USER : TOKEN_KEYS.USER);
         if (typeof window !== 'undefined') window.location.href = isAdmin ? '/admin' : '/auth/signin';
       } finally { isRefreshing = false; }
